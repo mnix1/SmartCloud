@@ -1,0 +1,90 @@
+package com.smartcloud.database;
+
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+
+import com.smartcloud.holder.FileHolder;
+import com.smartcloud.holder.MachineHolder;
+import com.smartcloud.holder.SegmentHolder;
+
+public class ClientDatabase extends Database {
+    public static ClientDatabase instance;
+    public static final String DB_NAME_CLIENT = "SmartCloudClientDb";
+
+    private ClientDatabase(Context context, SQLiteDatabase database) {
+        super(context, database);
+    }
+
+    public static String createTableMachineHolderSQL() {
+        StringBuilder stringBuilder = new StringBuilder(CREATE_STM);
+        stringBuilder.append(MachineHolder.TABLE_NAME);
+        stringBuilder.append(MachineHolder.TABLE_COLUMNS_CLIENT);
+        stringBuilder.append(END_STM);
+        return stringBuilder.toString();
+    }
+
+    public static String createTableSegmentHolderSQL() {
+        StringBuilder stringBuilder = new StringBuilder(CREATE_STM);
+        stringBuilder.append(SegmentHolder.TABLE_NAME);
+        stringBuilder.append(SegmentHolder.TABLE_COLUMNS_CLIENT);
+        stringBuilder.append(END_STM);
+        return stringBuilder.toString();
+    }
+
+    public static ClientDatabase init(Context context) {
+        SQLiteDatabase database = context.openOrCreateDatabase(DB_NAME_CLIENT, Context.MODE_PRIVATE, null);
+        database.execSQL(createTableMachineHolderSQL());
+        database.execSQL(createTableSegmentHolderSQL());
+        System.out.println("DB CREATED " + database.getPath());
+        instance = new ClientDatabase(context, database);
+        return instance;
+    }
+
+    public boolean insertMachine(String id) {
+        ContentValues args = new ContentValues();
+        args.put("id", id);
+        long result = mDatabase.insert(MachineHolder.TABLE_NAME, null, args);
+        if (result == -1) {
+            return false;
+        }
+        return true;
+    }
+
+    public MachineHolder selectMachine() {
+        Cursor cursor = mDatabase.query(MachineHolder.TABLE_NAME, null, null, null, null, null, null);
+        if (!cursor.moveToFirst()) {
+            return null;
+        }
+        String id = cursor.getString(cursor.getColumnIndex("id"));
+        cursor.close();
+        return new MachineHolder(id);
+    }
+
+    public boolean insertSegment(SegmentHolder segmentHolder) {
+        ContentValues args = new ContentValues();
+        args.put("id", segmentHolder.getId());
+        args.put("path", segmentHolder.getPath());
+        long result = mDatabase.insert(SegmentHolder.TABLE_NAME, null, args);
+        if (result == -1) {
+            return false;
+        }
+        return true;
+    }
+
+    public SegmentHolder selectSegment(Long id) {
+        Cursor cursor = mDatabase.rawQuery("SELECT path FROM " + SegmentHolder.TABLE_NAME + " WHERE id = " + id, null);
+        //mDatabase.query(SegmentHolder.TABLE_NAME, new String[]{"path"}, "id = ?s", new String[]{id.toString()}, null, null, null);
+        if (!cursor.moveToFirst()) {
+            return null;
+        }
+        String path = cursor.getString(cursor.getColumnIndex("path"));
+        cursor.close();
+        return new SegmentHolder(id, path);
+    }
+
+    public int deleteSegment(Long id) {
+        return mDatabase.delete(SegmentHolder.TABLE_NAME, "id = ?s", new String[]{id.toString()});
+    }
+}
