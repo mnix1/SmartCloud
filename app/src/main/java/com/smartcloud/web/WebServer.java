@@ -3,24 +3,26 @@ package com.smartcloud.web;
 import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.file.FileManager;
 import com.smartcloud.holder.FileHolder;
-import com.smartcloud.util.Util;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 public class WebServer extends NanoHTTPD {
     public static final int PORT = 8080;
 
-    private static String FILE_UPLOAD_HTML = "<form method='post' enctype='multipart/form-data'><input type='file' name='file' /><input type='submit' value='Send' /></form>";
-
     public WebServer() {
         super(PORT);
         setTempFileManagerFactory(new FileManagerFactory());
+    }
+
+    public static Response newFixedLengthResponse(Response.IStatus status, String mimeType, String message) {
+        Response response = NanoHTTPD.newFixedLengthResponse(status, mimeType, message);
+        response.addHeader("Accept-Ranges", "bytes");
+        return response;
     }
 
     public void start() {
@@ -54,56 +56,28 @@ public class WebServer extends NanoHTTPD {
             Long fileId = Long.parseLong(uri.replace("/fileId=", ""));
             FileHolder fileHolder = ServerDatabase.instance.selectFile(fileId);
             FileManager.manageDownloadFile(fileHolder);
-            return serveFile(uri, session.getHeaders(), fileHolder.getFile(), getMimeTypeForFile(uri));
+            Response response = serveFile(uri, session.getHeaders(), fileHolder.getFile(), getMimeTypeForFile(uri));
+            FileManager.addDeleteFileListener(fileHolder.getFile(), response);
+            return response;
+        } else if (Method.GET.equals(method) && uri.contains("/deleteFileId=")) {
+            Long fileId = Long.parseLong(uri.replace("/deleteFileId=", ""));
+            FileManager.manageDeleteFile(fileId);
         }
-        Map<String, String> header = session.getHeaders();
-        Map<String, String> parms = session.getParms();
-//        String uri = session.getUri();
-        System.out.println(session.getMethod() + " '" + uri + "' ");
-
-        Iterator<String> e = header.keySet().iterator();
-        while (e.hasNext()) {
-            String value = e.next();
-            System.out.println("  HDR: '" + value + "' = '" + header.get(value) + "'");
-        }
-        e = parms.keySet().iterator();
-        while (e.hasNext()) {
-            String value = e.next();
-            System.out.println("  PRM: '" + value + "' = '" + parms.get(value) + "'");
-        }
-        return newFixedLengthResponse(createResponseHTML());
-    }
-
-    public String createResponseHTML() {
-        StringBuilder sb = new StringBuilder("<html><head><title>SmartCloud</title></head><body>");
-        sb.append(cloudFilesHTML());
-        sb.append(FILE_UPLOAD_HTML);
-        sb.append("</body></html>");
-        return sb.toString();
-    }
-
-    public String cloudFilesHTML() {
-        StringBuilder sb = new StringBuilder("<h1>SmartCloud Files</h1><ul>");
-        for (FileHolder fileHolder : ServerDatabase.instance.selectFile()) {
-            sb.append("<li><a href='/fileId=");
-            sb.append(fileHolder.getId());
-            sb.append("' download='");
-            sb.append(fileHolder.getName());
-            sb.append("'>");
-            sb.append(fileHolder.getName());
-            sb.append(" (");
-            sb.append(Util.sizeToReadableUnit(fileHolder.getSize()));
-            sb.append(")");
-            sb.append("</a></li>");
-        }
-        sb.append("</ul><br>");
-        return sb.toString();
-    }
-
-    public static Response newFixedLengthResponse(Response.IStatus status, String mimeType, String message) {
-        Response response = NanoHTTPD.newFixedLengthResponse(status, mimeType, message);
-        response.addHeader("Accept-Ranges", "bytes");
-        return response;
+//        Map<String, String> header = session.getHeaders();
+//        Map<String, String> parms = session.getParms();
+//        System.out.println(session.getMethod() + " '" + uri + "' ");
+//
+//        Iterator<String> e = header.keySet().iterator();
+//        while (e.hasNext()) {
+//            String value = e.next();
+//            System.out.println("  HDR: '" + value + "' = '" + header.get(value) + "'");
+//        }
+//        e = parms.keySet().iterator();
+//        while (e.hasNext()) {
+//            String value = e.next();
+//            System.out.println("  PRM: '" + value + "' = '" + parms.get(value) + "'");
+//        }
+        return newFixedLengthResponse(HTMLCreator.createResponseHTML());
     }
 
     private Response newFixedFileResponse(File file, String mime) throws FileNotFoundException {
@@ -215,4 +189,6 @@ public class WebServer extends NanoHTTPD {
     protected Response getForbiddenResponse(String s) {
         return newFixedLengthResponse(Response.Status.FORBIDDEN, NanoHTTPD.MIME_PLAINTEXT, "FORBIDDEN: " + s);
     }
+
+
 }

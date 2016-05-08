@@ -5,13 +5,12 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
-import com.smartcloud.holder.FileHolder;
 import com.smartcloud.holder.MachineHolder;
 import com.smartcloud.holder.SegmentHolder;
 
 public class ClientDatabase extends Database {
-    public static ClientDatabase instance;
     public static final String DB_NAME_CLIENT = "SmartCloudClientDb";
+    public static ClientDatabase instance;
 
     private ClientDatabase(Context context, SQLiteDatabase database) {
         super(context, database);
@@ -84,7 +83,8 @@ public class ClientDatabase extends Database {
         return new SegmentHolder(id, path);
     }
 
-    public int deleteSegment(Long id) {
-        return mDatabase.delete(SegmentHolder.TABLE_NAME, "id = ?s", new String[]{id.toString()});
+    public int deleteSegment(SegmentHolder segmentHolder) {
+        mDatabase.rawQuery("DELETE FROM " + SegmentHolder.TABLE_NAME + " WHERE id = " + segmentHolder.getId(), null);
+        return mDatabase.delete(SegmentHolder.TABLE_NAME, "id = ?", new String[]{segmentHolder.getId().toString()});
     }
 }

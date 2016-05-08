@@ -1,5 +1,6 @@
 package com.smartcloud.connection;
 
+import android.content.Context;
 import android.util.Log;
 
 import com.smartcloud.communication.CommunicationManager;
@@ -12,7 +13,12 @@ import java.net.Socket;
 public class ConnectionServer implements Runnable {
     public static final int SERVER_PORT = 6000;
 
+    private Context mContext;
     private ServerSocket mServerSocket;
+
+    public ConnectionServer(Context mContext) {
+        this.mContext = mContext;
+    }
 
     @Override
     public void run() {
@@ -25,7 +31,7 @@ public class ConnectionServer implements Runnable {
             try {
                 Socket socket = mServerSocket.accept();
                 Log.v("ConnectionServer", "new host connected: " + socket.getInetAddress());
-                CommunicationManager communicationManager = new ServerCommunication(socket);
+                CommunicationManager communicationManager = new ServerCommunication(socket, mContext);
                 new Thread(communicationManager).start();
             } catch (IOException e) {
                 e.printStackTrace();

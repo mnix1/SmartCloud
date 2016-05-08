@@ -1,6 +1,9 @@
 package com.smartcloud.communication;
 
+import android.content.Context;
+
 import com.smartcloud.constant.MethodType;
+import com.smartcloud.network.NetworkManager;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -8,8 +11,8 @@ import java.net.Socket;
 public class ServerCommunication extends CommunicationManager {
     ServerCommunication instance = null;
 
-    public ServerCommunication(Socket socket) {
-        super(socket);
+    public ServerCommunication(Socket socket, Context context) {
+        super(socket, context);
         instance = this;
     }
 
@@ -23,6 +26,8 @@ public class ServerCommunication extends CommunicationManager {
                         message = mInput.readLine();
                     } catch (IOException e) {
                         e.printStackTrace();
+//                        NetworkManager.init(mContext);
+                        break;
                     }
                     if (message == null) {
                         break;

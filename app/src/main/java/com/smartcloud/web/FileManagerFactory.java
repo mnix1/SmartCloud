@@ -40,7 +40,8 @@ public class FileManagerFactory implements NanoHTTPD.TempFileManagerFactory {
 
         @Override
         public NanoHTTPD.TempFile createTempFile(String filename_hint) throws Exception {
-            NanoHTTPD.DefaultTempFile tempFile = filename_hint != null ? new NanoHTTPD.DefaultTempFile(this.tmpdir.getAbsoluteFile() + "/" + filename_hint) : new NanoHTTPD.DefaultTempFile(this.tmpdir);
+            NanoHTTPD.TempFile tempFile = filename_hint != null ? new PartFile(new File(this.tmpdir.getAbsoluteFile() + "/" + filename_hint)) : new NanoHTTPD.DefaultTempFile(this.tmpdir);
+//            NanoHTTPD.DefaultTempFile tempFile = filename_hint != null ? new NanoHTTPD.DefaultTempFile(this.tmpdir.getAbsoluteFile() + "/" + filename_hint) : new NanoHTTPD.DefaultTempFile(this.tmpdir);
             this.tempFiles.add(tempFile);
             System.out.println("Created tempFile: " + tempFile.getName());
             return tempFile;

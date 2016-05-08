@@ -20,6 +20,7 @@ import java.util.List;
 
 public class NetworkManager {
     public static NetworkManager instance;
+    public static boolean createAp = true;
 
     private final Context mContext;
     private final WifiManager mWifiManager;
@@ -113,18 +114,23 @@ public class NetworkManager {
         }
         if (mWifiNetworkInfo != null && mWifiNetworkInfo.isConnected()) {
             WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
-            if (NetworkHelper.convertToQuotedString(NetworkHelper.SSID).equals(wifiInfo.getSSID())) {
+            if (NetworkHelper.convertToQuotedString(NetworkHelper.SSID).equals(wifiInfo.getSSID()) || NetworkHelper.SSID.equals(wifiInfo.getSSID())) {
                 notifyInitialized(MachineRole.SLAVE);
             } else {
                 disconnect();
+                startScan();
             }
         } else {
             if (isWifiApAvailable != null) {
                 if (isWifiApAvailable) {
                     connect();
                 } else {
-                    createWifiAp();
-                    notifyInitialized(MachineRole.MASTER);
+                    if(createAp){
+                        createWifiAp();
+                        notifyInitialized(MachineRole.MASTER);
+                    } else {
+                        startScan();
+                    }
                 }
             }
         }

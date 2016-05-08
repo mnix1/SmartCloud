@@ -43,7 +43,7 @@ public class ConnectionManager implements NetworkInitializedListener {
     private void startServer() {
         ServerDatabase.init(mContext);
         CloudHolder.updateMachines(MachineHolder.ME);
-        ConnectionServer connectionServer = new ConnectionServer();
+        ConnectionServer connectionServer = new ConnectionServer(mContext);
         mServerThread = new Thread(connectionServer);
         mServerThread.start();
         mWebServer = new WebServer();
@@ -53,7 +53,7 @@ public class ConnectionManager implements NetworkInitializedListener {
     private void startClient() {
         try {
             NetworkHelper.setServerAddress(mContext);
-            CommunicationManager communicationManager = new ClientCommunication(new Socket(CloudHolder.serverAddress, ConnectionServer.SERVER_PORT));
+            CommunicationManager communicationManager = new ClientCommunication(new Socket(CloudHolder.serverAddress, ConnectionServer.SERVER_PORT), mContext);
             mClientThread = new Thread(communicationManager);
             mClientThread.start();
         } catch (Exception e) {

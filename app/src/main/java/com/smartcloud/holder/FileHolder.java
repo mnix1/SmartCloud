@@ -5,6 +5,7 @@ import java.io.Serializable;
 import java.util.Map;
 
 public class FileHolder implements Serializable {
+    private static final long serialVersionUID = 1L;
     public final static String TABLE_NAME = "file";
     public final static String TABLE_COLUMNS_SERVER = "(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR, size NUMBER)";
 
@@ -16,6 +17,12 @@ public class FileHolder implements Serializable {
     public FileHolder(File file) {
         this.file = file;
         this.name = file.getName();
+        this.size = file.length();
+    }
+
+    public FileHolder(Long id, File file) {
+        this.id = id;
+        this.file = file;
         this.size = file.length();
     }
 

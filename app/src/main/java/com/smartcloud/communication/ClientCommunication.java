@@ -1,16 +1,19 @@
 package com.smartcloud.communication;
 
+import android.content.Context;
+
 import com.smartcloud.constant.MethodType;
+import com.smartcloud.network.NetworkManager;
 
 import java.io.IOException;
 import java.net.Socket;
 
 public class ClientCommunication extends CommunicationManager {
-    ClientCommunication instance = null;
+    private ClientCommunication instance = null;
 
-    public ClientCommunication(Socket socket) {
-        super(socket);
-        instance = this;
+    public ClientCommunication(Socket socket, Context context) {
+        super(socket, context);
+        this.instance = this;
     }
 
     void initReadThread() {
@@ -24,8 +27,23 @@ public class ClientCommunication extends CommunicationManager {
                         message = mInput.readLine();
                     } catch (IOException e) {
                         e.printStackTrace();
+                        try {
+                            mSocket.close();
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                        NetworkManager.createAp = false;
+                        NetworkManager.init(mContext);
+                        break;
                     }
-                    if (message == null) {
+                    if (message == null || message.isEmpty() || message.equals(" ")) {
+                        try {
+                            mSocket.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        NetworkManager.createAp = false;
+                        NetworkManager.init(mContext);
                         break;
                     }
                     CommunicationTaskHolder.findAction(message, instance);

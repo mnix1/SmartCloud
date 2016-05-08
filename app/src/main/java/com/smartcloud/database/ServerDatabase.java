@@ -14,8 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ServerDatabase extends Database {
-    public static ServerDatabase instance;
     public static final String DB_NAME_SERVER = "SmartCloudServerDb";
+    public static ServerDatabase instance;
 
     private ServerDatabase(Context context, SQLiteDatabase database) {
         super(context, database);
@@ -65,7 +65,7 @@ public class ServerDatabase extends Database {
         }
         FileHolder fileHolder = new FileHolder(id, cursor.getString(cursor.getColumnIndex("name")), cursor.getLong(cursor.getColumnIndex("size")));
         cursor.close();
-        fileHolder.setFile(new File(FileManager.storageDir+"/"+fileHolder.getName()));
+        fileHolder.setFile(new File(FileManager.storageDir + "/" + fileHolder.getName()));
         return fileHolder;
     }
 
@@ -83,8 +83,8 @@ public class ServerDatabase extends Database {
         ContentValues args = new ContentValues();
         args.put("fileId", segmentHolder.getFileId());
         args.put("machineId", segmentHolder.getMachineId());
-        args.put("offset", segmentHolder.getOffset());
-        args.put("size", segmentHolder.getSize());
+        args.put("byteFrom", segmentHolder.getByteFrom());
+        args.put("byteTo", segmentHolder.getByteTo());
         long result = mDatabase.insert(SegmentHolder.TABLE_NAME, null, args);
         if (result == -1) {
             return false;
@@ -93,22 +93,46 @@ public class ServerDatabase extends Database {
         return true;
     }
 
+//    public List<SegmentHolder> selectSegment(Long fileId, String machineId) {
+//        Cursor cursor = mDatabase.rawQuery("SELECT id, fileId, machineId, byteFrom, byteTo FROM " + SegmentHolder.TABLE_NAME + " WHERE fileId = " + fileId + " AND machineId = " + machineId, null);
+//        List<SegmentHolder> segments = new ArrayList<>(cursor.getCount());
+//        while (cursor.moveToNext()) {
+//            segments.add(new SegmentHolder(cursor.getLong(cursor.getColumnIndex("id")),
+//                    cursor.getLong(cursor.getColumnIndex("fileId")),
+//                    cursor.getString(cursor.getColumnIndex("machineId")),
+//                    cursor.getLong(cursor.getColumnIndex("byteFrom")),
+//                    cursor.getLong(cursor.getColumnIndex("byteTo"))));
+//        }
+//        cursor.close();
+//        return segments;
+//    }
+
     public List<SegmentHolder> selectSegment(Long fileId) {
         Cursor cursor = fileId != null ?
-                mDatabase.rawQuery("SELECT id, fileId, machineId, offset,size FROM " + SegmentHolder.TABLE_NAME + " WHERE fileId = " + fileId, null):
+                mDatabase.rawQuery("SELECT id, fileId, machineId, byteFrom, byteTo FROM " + SegmentHolder.TABLE_NAME + " WHERE fileId = " + fileId, null):
 //                mDatabase.query(SegmentHolder.TABLE_NAME, new String[]{"id", "fileId", "machineId", "offset", "size"},
 //                        "fileId = '?s'", new String[]{fileId.toString()}, null, null, null) :
-                mDatabase.query(SegmentHolder.TABLE_NAME, new String[]{"id", "fileId", "machineId", "offset", "size"},
+                mDatabase.query(SegmentHolder.TABLE_NAME, new String[]{"id", "fileId", "machineId", "byteFrom", "byteTo"},
                         null, null, null, null, null);
         List<SegmentHolder> segments = new ArrayList<>(cursor.getCount());
         while (cursor.moveToNext()) {
             segments.add(new SegmentHolder(cursor.getLong(cursor.getColumnIndex("id")),
                     cursor.getLong(cursor.getColumnIndex("fileId")),
                     cursor.getString(cursor.getColumnIndex("machineId")),
-                    cursor.getLong(cursor.getColumnIndex("offset")),
-                    cursor.getLong(cursor.getColumnIndex("size"))));
+                    cursor.getLong(cursor.getColumnIndex("byteFrom")),
+                    cursor.getLong(cursor.getColumnIndex("byteTo"))));
         }
         cursor.close();
         return segments;
+    }
+
+    public int deleteFile(Long fileId) {
+        return mDatabase.delete(FileHolder.TABLE_NAME, "id = ?", new String[]{fileId.toString()});
+//        mDatabase.rawQuery("DELETE FROM " + FileHolder.TABLE_NAME + " WHERE id = " + fileId, null);
+    }
+
+    public int deleteSegments(Long fileId) {
+//        mDatabase.rawQuery("DELETE FROM " + SegmentHolder.TABLE_NAME + " WHERE fileId = " + fileId, null);
+        return mDatabase.delete(SegmentHolder.TABLE_NAME, "fileId = ?", new String[]{fileId.toString()});
     }
 }

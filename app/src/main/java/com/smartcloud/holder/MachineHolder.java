@@ -8,6 +8,7 @@ import java.io.Serializable;
 import java.net.InetAddress;
 
 public class MachineHolder implements Serializable {
+    private static final long serialVersionUID = 1L;
     public final static MachineHolder ME = new MachineHolder();
 
     public final static String TABLE_NAME = "machine";
@@ -93,7 +94,10 @@ public class MachineHolder implements Serializable {
 
     @Override
     public boolean equals(Object o) {
-        return id.equals(((MachineHolder) o).getId());
+        if (o instanceof MachineHolder) {
+            return id.equals(((MachineHolder) o).getId());
+        }
+        return super.equals(o);
     }
 
     @Override
