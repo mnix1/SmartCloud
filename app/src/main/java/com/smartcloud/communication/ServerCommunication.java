@@ -1,70 +1,43 @@
 package com.smartcloud.communication;
 
-import android.content.Context;
-
-import com.smartcloud.constant.MethodType;
-import com.smartcloud.network.NetworkManager;
-
 import java.io.IOException;
 import java.net.Socket;
 
-public class ServerCommunication extends CommunicationManager {
-    ServerCommunication instance = null;
+public abstract class ServerCommunication extends CommunicationManager implements Runnable {
 
-    public ServerCommunication(Socket socket, Context context) {
-        super(socket, context);
-        instance = this;
+    public ServerCommunication(Socket socket) {
+        super(socket);
     }
 
-    void initReadThread() {
-        readThread = new Thread(new Runnable() {
+    void initThread() {
+        mThread = new Thread(new Runnable() {
             @Override
             public void run() {
                 while (!Thread.currentThread().isInterrupted() && mSocket.isConnected()) {
-                    String message = null;
+                    System.out.println("ServerCommunication mThread begin loop");
+                    String taskName = null;
                     try {
-                        message = mInput.readLine();
+                        taskName = mInput.readLine();
                     } catch (IOException e) {
                         e.printStackTrace();
-//                        NetworkManager.init(mContext);
                         break;
                     }
-                    if (message == null) {
+                    if (taskName == null) {
                         break;
                     }
-                    System.out.println("ServerCommunication readThread " + message);
-                    CommunicationTaskHolder.findAction(message, instance);
+                    System.out.println("ServerCommunication mThread end loop " + taskName);
+                    taskExecution(taskName);
                 }
             }
         });
-        readThread.start();
     }
 
-    void initWriteThread() {
-        writeThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                while (!Thread.currentThread().isInterrupted() && mSocket.isConnected()) {
-                    synchronized (tasks) {
-                        while (!tasks.isEmpty()) {
-                            System.out.println("ServerCommunication writeThread isEmpty");
-                            CommunicationTaskHolder taskHolder = tasks.get(0);
-                            taskHolder.findAction(MethodType.WRITE, instance);
-                            tasks.remove(0);
-                            System.out.println("ServerCommunication writeThread isEmpty end " + taskHolder.task);
-                        }
-                    }
-                }
-                System.out.println("ServerCommunication END");
-            }
-        });
-        writeThread.start();
-    }
+    public abstract void taskExecution(String taskName);
 
     @Override
     public void run() {
-        initReadThread();
-        initWriteThread();
+        initThread();
+        mThread.start();
     }
 
 }

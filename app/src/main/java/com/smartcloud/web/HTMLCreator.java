@@ -1,12 +1,12 @@
 package com.smartcloud.web;
 
 import com.smartcloud.database.ServerDatabase;
-import com.smartcloud.holder.CloudHolder;
 import com.smartcloud.holder.FileHolder;
 import com.smartcloud.util.Util;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
+import java.util.Objects;
 
 public class HTMLCreator {
     private static String FILE_UPLOAD_HTML = "<form method='post' enctype='multipart/form-data'><input type='file' name='file' /><input type='submit' value='Send' /></form>";
@@ -22,7 +22,7 @@ public class HTMLCreator {
 
     public static String cloudFilesHTML() {
         StringBuilder sb = new StringBuilder("<h2>Files</h2><ul>");
-        for (FileHolder fileHolder : ServerDatabase.instance.selectFile()) {
+        for (FileHolder fileHolder : ServerDatabase.instance.selectFile(true)) {
             sb.append("<li>");
             sb.append("<a href='/fileId=");
             sb.append(fileHolder.getId());
@@ -46,10 +46,27 @@ public class HTMLCreator {
 
     public static String cloudStatisticsHTML() {
         StringBuilder sb = new StringBuilder("<h2>Statistics</h2>");
-        sb.append("<h3>Machines</h3>").append(tableHTML(new String[]{"Id", "Machine Role"}, CloudHolder.getMachines(), new String[]{"getId", "getMachineRole"}));
-        sb.append("<h3>Files</h3>").append(tableHTML(new String[]{"Id", "Name", "Size"}, ServerDatabase.instance.selectFile(), new String[]{"getId", "getName", "getSize"}));
-        sb.append("<h3>Segments</h3>").append(tableHTML(new String[]{"Id", "File Id", "Machine Id", "Byte From", "Byte To"},
-                ServerDatabase.instance.selectSegment(null), new String[]{"getId", "getFileId", "getMachineId", "getByteFrom", "getByteTo"}));
+        List<? extends Object> list = ServerDatabase.instance.selectMachine(true);
+        if (!list.isEmpty()) {
+            sb.append("<h3>Machines Active</h3>").append(tableHTML(new String[]{"Id", "Machine Role"}, list, new String[]{"getId", "getMachineRole"}));
+        }
+        list = ServerDatabase.instance.selectMachine(false);
+        if (!list.isEmpty()) {
+            sb.append("<h3>Machines Inactive</h3>").append(tableHTML(new String[]{"Id", "Machine Role"}, list, new String[]{"getId", "getMachineRole"}));
+        }
+        list = ServerDatabase.instance.selectFile(true);
+        if (!list.isEmpty()) {
+            sb.append("<h3>Files Active</h3>").append(tableHTML(new String[]{"Id", "Name", "Size"}, list, new String[]{"getId", "getName", "getSize"}));
+        }
+        list = ServerDatabase.instance.selectFile(false);
+        if (!list.isEmpty()) {
+            sb.append("<h3>Files Inactive</h3>").append(tableHTML(new String[]{"Id", "Name", "Size"}, list, new String[]{"getId", "getName", "getSize"}));
+        }
+        list = ServerDatabase.instance.selectSegment(null);
+        if (!list.isEmpty()) {
+            sb.append("<h3>Segments</h3>").append(tableHTML(new String[]{"Id", "File Id", "Machine Id", "Byte From", "Byte To"}, list,
+                    new String[]{"getId", "getFileId", "getMachineId", "getByteFrom", "getByteTo"}));
+        }
         return sb.toString();
     }
 

@@ -4,11 +4,12 @@ import android.content.Context;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 
-import com.smartcloud.holder.CloudHolder;
+import com.smartcloud.MainActivity;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -38,11 +39,29 @@ public class NetworkHelper {
         return "\"" + string + "\"";
     }
 
-    public static WifiManager getWifiManager(Context context) {
-        return (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+    public static WifiManager getWifiManager() {
+        return (WifiManager) MainActivity.currentContext.getSystemService(Context.WIFI_SERVICE);
     }
 
-    public static void setServerAddress(Context context) {
+    public static InetAddress inetAddressFromInt(int addr) {
+        try {
+            return Inet4Address.getByAddress(new byte[]{
+                    (byte) addr, (byte) (addr >>> 8), (byte) (addr >>> 16), (byte) (addr >>> 24)});
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static String byteArrayToIpAddress(byte[] bytes) {
+        String address = Integer.toString((bytes[0] + 256) % 256);
+        for (int i = 1; i < bytes.length; i++) {
+            address += "." + (bytes[i] + 256) % 256;
+        }
+        return address;
+    }
+
+    public static InetAddress getMasterAddress() {
         List<String> arpTableRows = new ArrayList<>();
         BufferedReader br = null;
         try {
@@ -64,14 +83,13 @@ public class NetworkHelper {
             }
         }
         if (!arpTableRows.isEmpty()) {
-            System.out.println("ARP TABLE SERVER: " + arpTableRows.get(0));
+//            System.out.println("ARP TABLE SERVER: " + arpTableRows.get(0));
             try {
-                CloudHolder.serverAddress = InetAddress.getByName(arpTableRows.get(0));
+                return InetAddress.getByName(arpTableRows.get(0));
             } catch (UnknownHostException e) {
                 e.printStackTrace();
             }
-        } else {
-            CloudHolder.serverAddress = ConnectionHelper.inetAddressFromInt(NetworkHelper.getWifiManager(context).getDhcpInfo().gateway);
         }
+        return inetAddressFromInt(NetworkHelper.getWifiManager().getDhcpInfo().gateway);
     }
 }

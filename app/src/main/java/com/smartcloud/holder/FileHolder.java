@@ -1,8 +1,17 @@
 package com.smartcloud.holder;
 
+import com.smartcloud.communication.ClientCommunication;
+import com.smartcloud.connection.ConnectionServer;
+import com.smartcloud.database.ClientDatabase;
+import com.smartcloud.database.ServerDatabase;
+import com.smartcloud.task.MasterRequestDeleteSegmentToSlaveTask;
+import com.smartcloud.task.Task;
+
 import java.io.File;
+import java.io.IOException;
 import java.io.Serializable;
-import java.util.Map;
+import java.net.InetAddress;
+import java.net.Socket;
 
 public class FileHolder implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -29,6 +38,29 @@ public class FileHolder implements Serializable {
     public FileHolder(Long id, String name, Long size) {
         this.id = id;
         this.name = name;
+        this.size = size;
+    }
+
+    public static void deleteFile(Long fileId) {
+        for (SegmentHolder segmentHolder : ServerDatabase.instance.selectSegment(fileId)) {
+            MachineHolder machineHolder = ServerDatabase.instance.selectMachine(segmentHolder.getMachineId());
+            if (machineHolder.isServer()) {
+                new File(ClientDatabase.instance.selectSegment(segmentHolder.getId()).getPath()).delete();
+                ClientDatabase.instance.deleteSegment(segmentHolder);
+            } else {
+                try {
+                    Task task = new MasterRequestDeleteSegmentToSlaveTask(segmentHolder.getId());
+                    new ClientCommunication(new Socket(InetAddress.getByName(machineHolder.getAddress()), ConnectionServer.SERVER_PORT), task).init();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        ServerDatabase.instance.deleteFile(fileId);
+        ServerDatabase.instance.deleteSegments(fileId);
+    }
+
+    public FileHolder(Long size) {
         this.size = size;
     }
 

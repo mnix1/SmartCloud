@@ -11,6 +11,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.util.Log;
 
+import com.smartcloud.MainActivity;
 import com.smartcloud.connection.ConnectionManager;
 import com.smartcloud.constant.MachineRole;
 import com.smartcloud.util.NetworkHelper;
@@ -22,7 +23,6 @@ public class NetworkManager {
     public static NetworkManager instance;
     public static boolean createAp = true;
 
-    private final Context mContext;
     private final WifiManager mWifiManager;
     private final WifiReceiver mWifiReceiver;
 
@@ -33,17 +33,16 @@ public class NetworkManager {
 
     private List<NetworkInitializedListener> mNetworkInitializedListeners;
 
-    private NetworkManager(Context context) {
+    private NetworkManager() {
         this.mNetworkInitializedListeners = new ArrayList<>();
-        this.mContext = context;
-        this.mWifiManager = NetworkHelper.getWifiManager(this.mContext);
+        this.mWifiManager = NetworkHelper.getWifiManager();
         this.mWifiReceiver = new WifiReceiver();
         this.mWifiApControl = WifiApControl.getApControl(mWifiManager);
     }
 
-    public static void init(Context context){
-        instance = new NetworkManager(context);
-        instance.addNetworkInitializerListener(new ConnectionManager(context));
+    public static void init(){
+        instance = new NetworkManager();
+        instance.addNetworkInitializerListener(new ConnectionManager());
         instance.setNetworkDisable();
         instance.registerReceiver();
         instance.setWifiEnabled();
@@ -83,11 +82,11 @@ public class NetworkManager {
         mIntentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         mIntentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
         mIntentFilter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
-        mContext.registerReceiver(mWifiReceiver, mIntentFilter);
+        MainActivity.currentContext.registerReceiver(mWifiReceiver, mIntentFilter);
     }
 
     public void unregisterReceiver() {
-        mContext.unregisterReceiver(mWifiReceiver);
+        MainActivity.currentContext.unregisterReceiver(mWifiReceiver);
     }
 
     private Boolean isWifiApAvailable() {

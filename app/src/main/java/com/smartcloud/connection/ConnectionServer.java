@@ -1,10 +1,12 @@
 package com.smartcloud.connection;
 
-import android.content.Context;
 import android.util.Log;
 
 import com.smartcloud.communication.CommunicationManager;
+import com.smartcloud.communication.MasterServerCommunication;
 import com.smartcloud.communication.ServerCommunication;
+import com.smartcloud.communication.SlaveServerCommunication;
+import com.smartcloud.database.ClientDatabase;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -13,12 +15,7 @@ import java.net.Socket;
 public class ConnectionServer implements Runnable {
     public static final int SERVER_PORT = 6000;
 
-    private Context mContext;
     private ServerSocket mServerSocket;
-
-    public ConnectionServer(Context mContext) {
-        this.mContext = mContext;
-    }
 
     @Override
     public void run() {
@@ -31,8 +28,13 @@ public class ConnectionServer implements Runnable {
             try {
                 Socket socket = mServerSocket.accept();
                 Log.v("ConnectionServer", "new host connected: " + socket.getInetAddress());
-                CommunicationManager communicationManager = new ServerCommunication(socket, mContext);
-                new Thread(communicationManager).start();
+                ServerCommunication serverCommunication = null;
+                if (ClientDatabase.instance.selectMachine().isServer()) {
+                    serverCommunication = new MasterServerCommunication(socket);
+                } else {
+                    serverCommunication = new SlaveServerCommunication(socket);
+                }
+                new Thread(serverCommunication).start();
             } catch (IOException e) {
                 e.printStackTrace();
             }
