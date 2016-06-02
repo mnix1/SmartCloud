@@ -42,5 +42,4 @@ public class ClientCommunication extends CommunicationManager {
             }
         });
     }
-
 }

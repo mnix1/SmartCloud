@@ -68,7 +68,6 @@ public class NetworkHelper {
             br = new BufferedReader(new FileReader("/proc/net/arp"));
             String line;
             while ((line = br.readLine()) != null) {
-//                System.out.println("ARP TABLE: " + line);
                 if (!line.equals("IP address       HW type     Flags       HW address            Mask     Device")) {
                     arpTableRows.add(line.substring(0, line.indexOf(" ")));
                 }
@@ -83,7 +82,6 @@ public class NetworkHelper {
             }
         }
         if (!arpTableRows.isEmpty()) {
-//            System.out.println("ARP TABLE SERVER: " + arpTableRows.get(0));
             try {
                 return InetAddress.getByName(arpTableRows.get(0));
             } catch (UnknownHostException e) {

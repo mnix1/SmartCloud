@@ -5,12 +5,15 @@ import android.util.Log;
 
 import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.holder.MachineHolder;
+import com.smartcloud.holder.SegmentHolder;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -76,27 +79,49 @@ public class Util {
         Log.v("SMART CLOUD", stringBuilder.toString());
     }
 
+    public static void readWrite(BufferedReader input, OutputStream output, int size) throws IOException {
+        int totalRead = 0;
+        while (totalRead < size) {
+            byte[] bytes = Base64.decode(input.readLine().getBytes(), Base64.NO_WRAP);
+            output.write(bytes);
+            totalRead += bytes.length;
+        }
+    }
 
-    public static void readFromFileWriteToStream(File file, Object output, int bufferSize) {
+    public static void readWrite(File file, PrintWriter output, int bufferSize) {
         FileInputStream fileInputStream = null;
         try {
             fileInputStream = new FileInputStream(file);
             byte[] buffer = new byte[bufferSize];
             int read;
-            if (output instanceof PrintWriter) {
-                PrintWriter printWriter = (PrintWriter) output;
-                while ((read = fileInputStream.read(buffer)) >= 0) {
-                    if (read == bufferSize) {
-                        printWriter.println(new String(Base64.encode(buffer, Base64.NO_WRAP)));
-                    } else {
-                        printWriter.println(new String(Base64.encode(Arrays.copyOf(buffer, read), Base64.NO_WRAP)));
-                    }
+            while ((read = fileInputStream.read(buffer)) >= 0) {
+                if (read == bufferSize) {
+                    output.println(new String(Base64.encode(buffer, Base64.NO_WRAP)));
+                } else {
+                    output.println(new String(Base64.encode(Arrays.copyOf(buffer, read), Base64.NO_WRAP)));
                 }
-            } else {
-                OutputStream outputStream = (OutputStream) output;
-                while ((read = fileInputStream.read(buffer)) >= 0) {
-                    outputStream.write(buffer, 0, read);
-                }
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                fileInputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void readWrite(File file, OutputStream output, int bufferSize) {
+        FileInputStream fileInputStream = null;
+        try {
+            fileInputStream = new FileInputStream(file);
+            byte[] buffer = new byte[bufferSize];
+            int read;
+            while ((read = fileInputStream.read(buffer)) >= 0) {
+                output.write(buffer, 0, read);
             }
 
         } catch (FileNotFoundException e) {
@@ -106,6 +131,28 @@ public class Util {
         } finally {
             try {
                 fileInputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void readWrite(BufferedReader input, File file, int size) {
+        FileOutputStream fileOutputStream = null;
+        try {
+            fileOutputStream = new FileOutputStream(file);
+            int totalRead = 0;
+            while (totalRead < size) {
+                byte[] bytes = Base64.decode(input.readLine().getBytes(), Base64.NO_WRAP);
+                fileOutputStream.write(bytes);
+                fileOutputStream.flush();
+                totalRead += bytes.length;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                fileOutputStream.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }

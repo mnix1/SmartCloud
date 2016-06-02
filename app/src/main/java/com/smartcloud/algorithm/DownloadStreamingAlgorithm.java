@@ -19,7 +19,7 @@ import java.net.InetAddress;
 import java.net.Socket;
 
 public class DownloadStreamingAlgorithm extends DownloadAlgorithm {
-    private int mBufferSize = 1024000;
+    private int mBufferSize = 16 * 1024;
 
     public DownloadStreamingAlgorithm(Long fileId, String mime) {
         super(ServerDatabase.instance.selectFile(fileId), mime);
@@ -49,7 +49,7 @@ public class DownloadStreamingAlgorithm extends DownloadAlgorithm {
                 if (machineHolder.isServer()) {
                     SegmentHolder localSegmentHolder = ClientDatabase.instance.selectSegment(segmentHolder.getId());
                     File file = new File(localSegmentHolder.getPath());
-                    Util.readFromFileWriteToStream(file, outputStream, 16 * 1024);
+                    Util.readWrite(file, outputStream, mBufferSize);
                 } else {
                     Task task = new MasterGetSegmentDataFromSlaveAndWriteToStreamTask(segmentHolder, outputStream);
                     new ClientCommunication(new Socket(InetAddress.getByName(machineHolder.getAddress()),

@@ -29,10 +29,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 
-public class UploadSegmentationAlgorithm extends UploadAlgorithm {
+public class UploadStreamingAlgorithm extends UploadAlgorithm {
     private int mSegmentSize = 1024000;
 
-    public UploadSegmentationAlgorithm(NanoHTTPD.HTTPSession session) {
+    public UploadStreamingAlgorithm(NanoHTTPD.HTTPSession session) {
         super(session);
     }
 
@@ -53,7 +53,7 @@ public class UploadSegmentationAlgorithm extends UploadAlgorithm {
         size -= mSession.rlen;
         if (mSession.rlen > 0) {
             startOffset = decodeMultipartFormDataStart(contentType, buf, mSession.parms);
-            int length = decodeMultipartFormDataEnd(contentType, buf, mSession.parms.get("boundaryId"));
+            int length = decodeMultipartFormDataEnd(buf, mSession.parms.get("boundaryId"));
             if (length >= 0) {
                 totalSize += length - startOffset;
             } else {
@@ -85,14 +85,14 @@ public class UploadSegmentationAlgorithm extends UploadAlgorithm {
             mSession.rlen = mSession.inputStream.read(buf, 0, (int) WebServer.REQUEST_BUFFER_LEN);
             size -= mSession.rlen;
             if (mSession.rlen > 0) {
-                int length = decodeMultipartFormDataEnd(contentType, buf, mSession.parms.get("boundaryId"));
+                int length = decodeMultipartFormDataEnd(buf, mSession.parms.get("boundaryId"));
                 totalOffset = segmentation(segment, totalOffset, buf, 0, length, fileHolder);
                 totalSize += length;
             }
         }
         if (totalOffset % mSegmentSize > 0) {
             SegmentHolder segmentHolder = new SegmentHolder(null, fileHolder.getId(), null, (long) totalSize - (totalOffset % mSegmentSize), (long) (totalSize));
-            manageUploadedFile(Arrays.copyOf(segment, totalOffset % mSegmentSize), fileHolder, segmentHolder);
+            saveSegmentData(Arrays.copyOf(segment, totalOffset % mSegmentSize), fileHolder, segmentHolder);
         }
         fileHolder.setSize((long) totalSize);
         ServerDatabase.instance.updateFile(fileHolder);
@@ -113,7 +113,7 @@ public class UploadSegmentationAlgorithm extends UploadAlgorithm {
             totalOffset += len;
             if (size == 0) {
                 SegmentHolder segmentHolder = new SegmentHolder(null, fileHolder.getId(), null, (long) totalOffset - segment.length, (long) (totalOffset));
-                manageUploadedFile(Arrays.copyOf(segment, segment.length), fileHolder, segmentHolder);
+                saveSegmentData(Arrays.copyOf(segment, segment.length), fileHolder, segmentHolder);
                 size = segment.length;
             }
         }
@@ -135,7 +135,6 @@ public class UploadSegmentationAlgorithm extends UploadAlgorithm {
         }
 
         String partName = null, fileName = null;
-        // Parse the reset of the header lines
         mpline = in.readLine();
         stringBuilder.append(mpline);
         offset += 2;
@@ -171,7 +170,7 @@ public class UploadSegmentationAlgorithm extends UploadAlgorithm {
         return stringBuilder.length() + offset;
     }
 
-    private int decodeMultipartFormDataEnd(NanoHTTPD.ContentType contentType, byte[] buf, String boundaryId) throws NanoHTTPD.ResponseException {
+    private int decodeMultipartFormDataEnd(byte[] buf, String boundaryId) throws NanoHTTPD.ResponseException {
         try {
             String data = new String(buf);
             return data.lastIndexOf(boundaryId) - 2;
@@ -182,7 +181,7 @@ public class UploadSegmentationAlgorithm extends UploadAlgorithm {
 
     private static SecureRandom random = new SecureRandom();
 
-    public static void manageUploadedFile(byte[] data, FileHolder fileHolder, SegmentHolder segmentHolder) {
+    private static void saveSegmentData(byte[] data, FileHolder fileHolder, SegmentHolder segmentHolder) {
         List<MachineHolder> machines = ServerDatabase.instance.selectMachine(true);
         MachineHolder machineHolder = machines.get(random.nextInt(machines.size()));
         segmentHolder.setMachineId(machineHolder.getId());
@@ -215,22 +214,6 @@ public class UploadSegmentationAlgorithm extends UploadAlgorithm {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
-//            machineHolder.getCommunicationManager().sendSegmentData(data, segmentHolder);
-//            List<CommunicationTaskHolder> tasks = machineHolder.getCommunicationManager().tasks;
-//            synchronized (tasks) {
-//                System.out.println("TASK ADDED " + TaskType.SEND_SEGMENT_DATA);
-//                tasks.add(new CommunicationTaskHolder(TaskType.SEND_SEGMENT_DATA, data, segmentHolder));
-//                System.out.println("TASK ADDED END");
-//            }
         }
-    }
-
-    public int getSegmentSize() {
-        return mSegmentSize;
-    }
-
-    public void setSegmentSize(int mSegmentSize) {
-        this.mSegmentSize = mSegmentSize;
     }
 }

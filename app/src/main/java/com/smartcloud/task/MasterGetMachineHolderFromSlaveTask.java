@@ -31,7 +31,7 @@ public class MasterGetMachineHolderFromSlaveTask extends Task {
         Date now = new Date();
         Map<MachineHolder, MasterGetMachineHolderFromSlaveTask> machineHolderTasks = new HashMap<MachineHolder, MasterGetMachineHolderFromSlaveTask>();
         for (MachineHolder machineHolder : ServerDatabase.instance.selectMachine()) {
-            if (now.getTime() - machineHolder.getLastContact().getTime() <= 100) {
+            if (now.getTime() - machineHolder.getLastContact().getTime() <= LAST_CONTACT_TRESHHOLD) {
                 continue;
             }
             if (machineHolder.isServer()) {
