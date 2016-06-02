@@ -176,9 +176,19 @@ public class ServerDatabase extends Database {
     }
 
     public List<FileHolder> selectFile(Boolean active) {
-        Cursor cursor = active == null ? mDatabase.query(FileHolder.TABLE_NAME, new String[]{"id", "name", "size"}, null, null, null, null, null) :
-                mDatabase.rawQuery("SELECT DISTINCT f.id as id, f.name as name, f.size as size FROM " + FileHolder.TABLE_NAME + " f, " +
-                        MachineHolder.TABLE_NAME + " m, " + SegmentHolder.TABLE_NAME + " s WHERE f.id = s.fileId AND s.machineId = m.id AND m.active = " + (active ? "1" : "0"), null);
+        Cursor cursor = null;
+        if (active == null) {
+            cursor = mDatabase.query(FileHolder.TABLE_NAME, new String[]{"id", "name", "size"}, null, null, null, null, null);
+        } else if (active) {
+            cursor = mDatabase.rawQuery("SELECT o.id as id, o.name as name, o.size as size FROM " +
+                    FileHolder.TABLE_NAME + " o WHERE o.id NOT IN (SELECT DISTINCT f.id FROM " +
+                    FileHolder.TABLE_NAME + " f, " + MachineHolder.TABLE_NAME + " m, " + SegmentHolder.TABLE_NAME +
+                    " s WHERE f.id = s.fileId AND ((s.machineId = m.id AND m.active = 0) OR (s.machineId NOT IN (SELECT DISTINCT id FROM " + MachineHolder.TABLE_NAME + "))))", null);
+        } else {
+            cursor = mDatabase.rawQuery("SELECT DISTINCT f.id as id, f.name as name, f.size as size FROM " + FileHolder.TABLE_NAME + " f, " +
+                    MachineHolder.TABLE_NAME + " m, " + SegmentHolder.TABLE_NAME +
+                    " s WHERE f.id = s.fileId AND ((s.machineId = m.id AND m.active = 0) OR (s.machineId NOT IN (SELECT DISTINCT id FROM " + MachineHolder.TABLE_NAME + ")))", null);
+        }
         List<FileHolder> files = new ArrayList<>(cursor.getCount());
         while (cursor.moveToNext()) {
             files.add(new FileHolder(cursor.getLong(cursor.getColumnIndex("id")), cursor.getString(cursor.getColumnIndex("name")), cursor.getLong(cursor.getColumnIndex("size"))));

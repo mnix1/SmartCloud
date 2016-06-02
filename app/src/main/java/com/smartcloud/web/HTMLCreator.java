@@ -1,22 +1,55 @@
 package com.smartcloud.web;
 
+import com.smartcloud.algorithm.Algorithm;
 import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.holder.FileHolder;
 import com.smartcloud.util.Util;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
-import java.util.Objects;
 
 public class HTMLCreator {
-    private static String FILE_UPLOAD_HTML = "<form method='post' enctype='multipart/form-data'><input type='file' name='file' /><input type='submit' value='Send' /></form>";
 
     public static String createResponseHTML() {
         StringBuilder sb = new StringBuilder("<html><head><title>SmartCloud</title></head><body><h1>SmartCloud</h1>");
         sb.append(cloudFilesHTML());
-        sb.append(FILE_UPLOAD_HTML);
+        sb.append(tableAlgorithmHTML());
+        sb.append(fileUploadFormHTML());
         sb.append(cloudStatisticsHTML());
         sb.append("</body></html>");
+        return sb.toString();
+    }
+
+    public static String fileUploadFormHTML() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("</br>Algorytm: <select id='algorithm' name='algorithm' onchange='selectChange()'>");
+        for (Algorithm algorithm : Algorithm.values()) {
+            sb.append("<option value='" + algorithm.toString() + "'>" + algorithm.toString() + "</option>");
+        }
+        sb.append("</select></br>");
+        sb.append("Stały rozmiar: <select id='segmentMaxSize' name='segmentMaxSize' onchange='selectChange()'>");
+        for (int size : Algorithm.sizes) {
+            if (size == 1024) {
+                sb.append("<option selected value='" + size + "'>" + size + "KB</option>");
+            } else {
+                sb.append("<option value='" + size + "'>" + size + "KB</option>");
+            }
+        }
+        sb.append("</select></br>");
+        if (ServerDatabase.instance.selectMachine(true).size() > 1) {
+            sb.append("Wrzucaj segmenty na Master: <input id='uploadToMaster' type='checkbox' onchange='selectChange()'></br>");
+        }
+        sb.append("<form id='uploadForm' method='post' enctype='multipart/form-data'>");
+        sb.append("<input type='file' name='file' /><input type='submit' value='Send' /></form>");
+        sb.append("<script>\n" +
+                "function selectChange(){\n" +
+                "    var algorithm = document.getElementById('algorithm').value;\n" +
+                "    var segmentMaxSize = document.getElementById('segmentMaxSize').value;\n" +
+                "    var uploadToMaster = (document.getElementById('uploadToMaster') && document.getElementById('uploadToMaster').checked) || true;\n" +
+                "    document.getElementById('uploadForm').setAttribute('action','/upload?algorithm='+algorithm+'&segmentMaxSize='+segmentMaxSize+'&uploadToMaster='+uploadToMaster);\n" +
+                "}\n" +
+                "selectChange();\n" +
+                "</script>");
         return sb.toString();
     }
 
@@ -48,29 +81,29 @@ public class HTMLCreator {
         StringBuilder sb = new StringBuilder("<h2>Statistics</h2>");
         List<? extends Object> list = ServerDatabase.instance.selectMachine(true);
         if (!list.isEmpty()) {
-            sb.append("<h3>Machines Active</h3>").append(tableHTML(new String[]{"Id", "Machine Role"}, list, new String[]{"getId", "getMachineRole"}));
+            sb.append("<h3>Machines Active</h3>").append(tableDomainHTML(new String[]{"Id", "Machine Role"}, list, new String[]{"getId", "getMachineRole"}));
         }
         list = ServerDatabase.instance.selectMachine(false);
         if (!list.isEmpty()) {
-            sb.append("<h3>Machines Inactive</h3>").append(tableHTML(new String[]{"Id", "Machine Role"}, list, new String[]{"getId", "getMachineRole"}));
+            sb.append("<h3>Machines Inactive</h3>").append(tableDomainHTML(new String[]{"Id", "Machine Role"}, list, new String[]{"getId", "getMachineRole"}));
         }
         list = ServerDatabase.instance.selectFile(true);
         if (!list.isEmpty()) {
-            sb.append("<h3>Files Active</h3>").append(tableHTML(new String[]{"Id", "Name", "Size"}, list, new String[]{"getId", "getName", "getSize"}));
+            sb.append("<h3>Files Active</h3>").append(tableDomainHTML(new String[]{"Id", "Name", "Size"}, list, new String[]{"getId", "getName", "getSize"}));
         }
         list = ServerDatabase.instance.selectFile(false);
         if (!list.isEmpty()) {
-            sb.append("<h3>Files Inactive</h3>").append(tableHTML(new String[]{"Id", "Name", "Size"}, list, new String[]{"getId", "getName", "getSize"}));
+            sb.append("<h3>Files Inactive</h3>").append(tableDomainHTML(new String[]{"Id", "Name", "Size"}, list, new String[]{"getId", "getName", "getSize"}));
         }
         list = ServerDatabase.instance.selectSegment(null);
         if (!list.isEmpty()) {
-            sb.append("<h3>Segments</h3>").append(tableHTML(new String[]{"Id", "File Id", "Machine Id", "Byte From", "Byte To"}, list,
-                    new String[]{"getId", "getFileId", "getMachineId", "getByteFrom", "getByteTo"}));
+            sb.append("<h3>Segments</h3>").append(tableDomainHTML(new String[]{"Id", "File Id", "Machine Id", "Byte From", "Byte To", "Size"}, list,
+                    new String[]{"getId", "getFileId", "getMachineId", "getByteFrom", "getByteTo", "getSize"}));
         }
         return sb.toString();
     }
 
-    private static String tableHTML(String[] labels, List<? extends Object> rows, String[] methodNames) {
+    private static String tableDomainHTML(String[] labels, List<? extends Object> rows, String[] methodNames) {
         StringBuilder sb = new StringBuilder("<table><thead><tr>");
         for (String label : labels) {
             sb.append("<th>").append(label).append("</th>");
@@ -89,6 +122,24 @@ public class HTMLCreator {
                     e.printStackTrace();
                 }
             }
+            sb.append("</tr>");
+        }
+        sb.append("</tbody></table>");
+        return sb.toString();
+    }
+
+    private static String tableAlgorithmHTML() {
+        StringBuilder sb = new StringBuilder("<table><thead><tr>");
+        sb.append("<th>").append("Id").append("</th>");
+        sb.append("<th>").append("Rozmiar danych").append("</th>");
+        sb.append("<th>").append("Dystrybucja").append("</th>");
+        sb.append("</tr></thead><tbody>");
+        for (Algorithm algorithm : Algorithm.values()) {
+            sb.append("<tr>");
+            sb.append("<td>").append(algorithm.toString()).append("</td>");
+            sb.append("<td>").append(algorithm.segmentDescription);
+            sb.append("</td>");
+            sb.append("<td>").append(algorithm.distributionDescription).append("</td>");
             sb.append("</tr>");
         }
         sb.append("</tbody></table>");

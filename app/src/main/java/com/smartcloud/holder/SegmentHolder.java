@@ -73,6 +73,10 @@ public class SegmentHolder implements Serializable {
         this.byteTo = byteTo;
     }
 
+    public Long getSize() {
+        return byteTo - byteFrom;
+    }
+
     public String getPath() {
         return path;
     }

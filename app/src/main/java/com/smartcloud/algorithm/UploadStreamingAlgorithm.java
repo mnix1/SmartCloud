@@ -24,16 +24,29 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.charset.Charset;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 
 public class UploadStreamingAlgorithm extends UploadAlgorithm {
-    private int mSegmentSize = 1024000;
+    private byte[] segment;
+    private int mSegmentSize;
+    private boolean mUploadToMaster;
 
     public UploadStreamingAlgorithm(NanoHTTPD.HTTPSession session) {
         super(session);
+        mAlgorithm = Enum.valueOf(Algorithm.class, session.getParms().get("algorithm"));
+        mUploadToMaster = Boolean.parseBoolean(session.getParms().get("uploadToMaster"));
+        if (mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITHOUT_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITH_MEM)) {
+            mSegmentSize = findRandomSegmentMaxSize();
+        } else if (mAlgorithm.equals(Algorithm.FIXED_BY_FILE_SIZE__EVERY)) {
+            double sizeForEachMachine = ((double) session.getBodySize()) / getAvailableMachines().size();
+            mSegmentSize = (int) Math.ceil(sizeForEachMachine);
+        } else {
+            mSegmentSize = Integer.parseInt(session.getParms().get("segmentMaxSize")) * 1024;
+        }
     }
 
     public void perform() throws IOException, NanoHTTPD.ResponseException {
@@ -41,9 +54,8 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
         if (!NanoHTTPD.Method.POST.equals(mSession.method) || !contentType.isMultipart()) {
             return;
         }
-        byte[] segment = new byte[mSegmentSize];
+        segment = new byte[mSegmentSize];
         int totalOffset = 0;
-        int startOffset = 0;
         int totalSize = 0;
         FileHolder fileHolder = null;
         long size = mSession.getBodySize();
@@ -52,7 +64,7 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
         mSession.rlen = mSession.inputStream.read(buf, 0, (int) Math.min(size, WebServer.REQUEST_BUFFER_LEN));
         size -= mSession.rlen;
         if (mSession.rlen > 0) {
-            startOffset = decodeMultipartFormDataStart(contentType, buf, mSession.parms);
+            int startOffset = decodeMultipartFormDataStart(contentType, buf, mSession.parms);
             int length = decodeMultipartFormDataEnd(buf, mSession.parms.get("boundaryId"));
             if (length >= 0) {
                 totalSize += length - startOffset;
@@ -61,14 +73,14 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
             }
             fileHolder.setName(mSession.parms.get("file"));
             ServerDatabase.instance.insertFile(fileHolder);
-            totalOffset = segmentation(segment, totalOffset, buf, startOffset, totalSize, fileHolder);
+            totalOffset = segmentation(totalOffset, buf, startOffset, totalSize, fileHolder);
         }
         if (size > WebServer.REQUEST_BUFFER_LEN * 2) {
             while (mSession.rlen >= 0 && size > WebServer.REQUEST_BUFFER_LEN * 2) {
                 mSession.rlen = mSession.inputStream.read(buf, 0, WebServer.REQUEST_BUFFER_LEN);
                 size -= mSession.rlen;
                 if (mSession.rlen > 0) {
-                    totalOffset = segmentation(segment, totalOffset, buf, 0, mSession.rlen, fileHolder);
+                    totalOffset = segmentation(totalOffset, buf, 0, mSession.rlen, fileHolder);
                     totalSize += mSession.rlen;
                 }
             }
@@ -77,7 +89,7 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
             mSession.rlen = mSession.inputStream.read(buf, 0, (int) size - WebServer.REQUEST_BUFFER_LEN);
             size -= mSession.rlen;
             if (mSession.rlen > 0) {
-                totalOffset = segmentation(segment, totalOffset, buf, 0, mSession.rlen, fileHolder);
+                totalOffset = segmentation(totalOffset, buf, 0, mSession.rlen, fileHolder);
                 totalSize += mSession.rlen;
             }
         }
@@ -86,7 +98,7 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
             size -= mSession.rlen;
             if (mSession.rlen > 0) {
                 int length = decodeMultipartFormDataEnd(buf, mSession.parms.get("boundaryId"));
-                totalOffset = segmentation(segment, totalOffset, buf, 0, length, fileHolder);
+                totalOffset = segmentation(totalOffset, buf, 0, length, fileHolder);
                 totalSize += length;
             }
         }
@@ -98,8 +110,7 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
         ServerDatabase.instance.updateFile(fileHolder);
     }
 
-
-    private int segmentation(byte[] segment, int totalOffset, byte[] buf, int offset, int length, FileHolder fileHolder) throws
+    private int segmentation(int totalOffset, byte[] buf, int offset, int length, FileHolder fileHolder) throws
             IOException {
         int segmentOffset = totalOffset % segment.length;
         int size = segment.length - segmentOffset;
@@ -181,9 +192,55 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
 
     private static SecureRandom random = new SecureRandom();
 
-    private static void saveSegmentData(byte[] data, FileHolder fileHolder, SegmentHolder segmentHolder) {
+    private List<String> usedMachineHoldersIds = new ArrayList<>();
+
+    private List<MachineHolder> getAvailableMachines() {
         List<MachineHolder> machines = ServerDatabase.instance.selectMachine(true);
+        if (!mUploadToMaster) {
+            MachineHolder toRemove = null;
+            for (MachineHolder machineHolder : machines) {
+                if (machineHolder.isServer()) {
+                    toRemove = machineHolder;
+                    break;
+                }
+            }
+            machines.remove(toRemove);
+        }
+        return machines;
+    }
+
+    private MachineHolder findRandomMachine(boolean withMemory) {
+        List<MachineHolder> machines = getAvailableMachines();
+        if (withMemory) {
+            if (machines.size() <= usedMachineHoldersIds.size()) {
+                usedMachineHoldersIds.clear();
+            } else {
+                for (String usedMachineId : usedMachineHoldersIds) {
+                    int indexToRemove = 0;
+                    for (MachineHolder machineHolder : machines) {
+                        if (machineHolder.getId().equals(usedMachineId)) {
+                            break;
+                        }
+                        indexToRemove++;
+                    }
+                    machines.remove(indexToRemove);
+                }
+            }
+        }
         MachineHolder machineHolder = machines.get(random.nextInt(machines.size()));
+        if (withMemory) {
+            usedMachineHoldersIds.add(machineHolder.getId());
+        }
+        return machineHolder;
+    }
+
+    private void saveSegmentData(byte[] data, FileHolder fileHolder, SegmentHolder segmentHolder) {
+        MachineHolder machineHolder = null;
+        if (mAlgorithm.equals(Algorithm.FIXED__RANDOM_WITHOUT_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITHOUT_MEM)) {
+            machineHolder = findRandomMachine(false);
+        } else if (mAlgorithm.equals(Algorithm.FIXED__RANDOM_WITH_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITH_MEM) || mAlgorithm.equals(Algorithm.FIXED_BY_FILE_SIZE__EVERY)) {
+            machineHolder = findRandomMachine(true);
+        }
         segmentHolder.setMachineId(machineHolder.getId());
         ServerDatabase.instance.insertSegment(segmentHolder);
         if (machineHolder.isServer()) {
@@ -215,5 +272,13 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
                 e.printStackTrace();
             }
         }
+        if (mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITHOUT_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITH_MEM)) {
+            mSegmentSize = findRandomSegmentMaxSize();
+            segment = new byte[mSegmentSize];
+        }
+    }
+
+    private int findRandomSegmentMaxSize() {
+        return Algorithm.sizes[random.nextInt(Algorithm.sizes.length)] * 1024;
     }
 }
