@@ -1,8 +1,8 @@
 package com.smartcloud.algorithm;
 
 public enum Algorithm {
-    FIXED__RANDOM_WITHOUT_MEM("", "Stały, nie większy wybrany", "Losowa bez pamięci"),
-    FIXED__RANDOM_WITH_MEM("", "Stały, nie większy wybrany", "Losowa z pamięcią"),
+    FIXED__RANDOM_WITHOUT_MEM("", "Stały, nie większy niż wybrany", "Losowa bez pamięci"),
+    FIXED__RANDOM_WITH_MEM("", "Stały, nie większy niż wybrany", "Losowa z pamięcią"),
     RANDOM__RANDOM_WITHOUT_MEM("", "Losowy", "Losowa bez pamięci"),
     RANDOM__RANDOM_WITH_MEM("", "Losowy", "Losowa z pamięcią"),
     FIXED_BY_FILE_SIZE__EVERY("", "Stały, zależny od rozmiaru pliku: ROZMIAR PLIKU / ILOSC MASZYN", "Każda maszyna"),

@@ -60,12 +60,6 @@ public abstract class CommunicationManager {
         return null;
     }
 
-    public void sendSegmentData(byte[] data, SegmentHolder segmentHolder) {
-        mOutput.println(segmentHolder.getId());
-        mOutput.println(data.length);
-        mOutput.println(new String(Base64.encode(data, Base64.NO_WRAP)));
-    }
-
     public SegmentHolder receiveSegmentDataAndSaveAsFile() {
         SegmentHolder segmentHolder = null;
         try {

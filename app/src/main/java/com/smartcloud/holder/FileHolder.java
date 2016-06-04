@@ -6,6 +6,7 @@ import com.smartcloud.database.ClientDatabase;
 import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.task.MasterRequestDeleteSegmentToSlaveTask;
 import com.smartcloud.task.Task;
+import com.smartcloud.util.Util;
 
 import java.io.File;
 import java.io.IOException;
@@ -41,9 +42,16 @@ public class FileHolder implements Serializable {
         this.size = size;
     }
 
+    public FileHolder(Long size) {
+        this.size = size;
+    }
+
     public static void deleteFile(Long fileId) {
         for (SegmentHolder segmentHolder : ServerDatabase.instance.selectSegment(fileId)) {
             MachineHolder machineHolder = ServerDatabase.instance.selectMachine(segmentHolder.getMachineId());
+            if (machineHolder == null || !machineHolder.isActive()) {
+                continue;
+            }
             if (machineHolder.isServer()) {
                 new File(ClientDatabase.instance.selectSegment(segmentHolder.getId()).getPath()).delete();
                 ClientDatabase.instance.deleteSegment(segmentHolder);
@@ -52,6 +60,8 @@ public class FileHolder implements Serializable {
                     Task task = new MasterRequestDeleteSegmentToSlaveTask(segmentHolder.getId());
                     new ClientCommunication(new Socket(InetAddress.getByName(machineHolder.getAddress()), ConnectionServer.SERVER_PORT), task).init();
                 } catch (IOException e) {
+                    machineHolder.setActive(false);
+                    ServerDatabase.instance.updateMachine(machineHolder);
                     e.printStackTrace();
                 }
             }
@@ -60,9 +70,6 @@ public class FileHolder implements Serializable {
         ServerDatabase.instance.deleteSegments(fileId);
     }
 
-    public FileHolder(Long size) {
-        this.size = size;
-    }
 
     public Long getId() {
         return id;
@@ -82,6 +89,10 @@ public class FileHolder implements Serializable {
 
     public Long getSize() {
         return size;
+    }
+
+    public String getSizeReadable() {
+        return Util.sizeToReadableUnit(getSize());
     }
 
     public void setSize(Long size) {

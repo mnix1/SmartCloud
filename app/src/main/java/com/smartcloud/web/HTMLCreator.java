@@ -3,7 +3,6 @@ package com.smartcloud.web;
 import com.smartcloud.algorithm.Algorithm;
 import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.holder.FileHolder;
-import com.smartcloud.util.Util;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
@@ -21,7 +20,7 @@ public class HTMLCreator {
     }
 
     public static String fileUploadFormHTML() {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder("<h2>Upload</h2>");
         sb.append("</br>Algorytm: <select id='algorithm' name='algorithm' onchange='selectChange()'>");
         for (Algorithm algorithm : Algorithm.values()) {
             sb.append("<option value='" + algorithm.toString() + "'>" + algorithm.toString() + "</option>");
@@ -45,7 +44,7 @@ public class HTMLCreator {
                 "function selectChange(){\n" +
                 "    var algorithm = document.getElementById('algorithm').value;\n" +
                 "    var segmentMaxSize = document.getElementById('segmentMaxSize').value;\n" +
-                "    var uploadToMaster = (document.getElementById('uploadToMaster') && document.getElementById('uploadToMaster').checked) || true;\n" +
+                "    var uploadToMaster = document.getElementById('uploadToMaster') == null ? true : document.getElementById('uploadToMaster').checked;\n" +
                 "    document.getElementById('uploadForm').setAttribute('action','/upload?algorithm='+algorithm+'&segmentMaxSize='+segmentMaxSize+'&uploadToMaster='+uploadToMaster);\n" +
                 "}\n" +
                 "selectChange();\n" +
@@ -64,9 +63,21 @@ public class HTMLCreator {
             sb.append("'>");
             sb.append(fileHolder.getName());
             sb.append(" (");
-            sb.append(Util.sizeToReadableUnit(fileHolder.getSize()));
+            sb.append(fileHolder.getSizeReadable());
             sb.append(") ");
             sb.append("</a>");
+            sb.append("<a href='/deleteFileId=");
+            sb.append(fileHolder.getId());
+            sb.append("' style='color:red'>-");
+            sb.append("</a>");
+            sb.append("</li>");
+        }
+        for (FileHolder fileHolder : ServerDatabase.instance.selectFile(false)) {
+            sb.append("<li>");
+            sb.append(fileHolder.getName());
+            sb.append(" (");
+            sb.append(fileHolder.getSizeReadable());
+            sb.append(") ");
             sb.append("<a href='/deleteFileId=");
             sb.append(fileHolder.getId());
             sb.append("' style='color:red'>-");
@@ -81,24 +92,26 @@ public class HTMLCreator {
         StringBuilder sb = new StringBuilder("<h2>Statistics</h2>");
         List<? extends Object> list = ServerDatabase.instance.selectMachine(true);
         if (!list.isEmpty()) {
-            sb.append("<h3>Machines Active</h3>").append(tableDomainHTML(new String[]{"Id", "Machine Role"}, list, new String[]{"getId", "getMachineRole"}));
+            sb.append("<h3>Machines Active</h3>").append(tableDomainHTML(new String[]{"Id", "Machine Role", "Address", "Free Space", "Total Space"}, list,
+                    new String[]{"getId", "getMachineRole", "getAddress", "getFreeSpaceReadable", "getTotalSpaceReadable"}));
         }
         list = ServerDatabase.instance.selectMachine(false);
         if (!list.isEmpty()) {
-            sb.append("<h3>Machines Inactive</h3>").append(tableDomainHTML(new String[]{"Id", "Machine Role"}, list, new String[]{"getId", "getMachineRole"}));
+            sb.append("<h3>Machines Inactive</h3>").append(tableDomainHTML(new String[]{"Id", "Machine Role", "Total Space", "Last Contact"}, list,
+                    new String[]{"getId", "getMachineRole", "getTotalSpaceReadable", "getLastContactFormat"}));
         }
         list = ServerDatabase.instance.selectFile(true);
         if (!list.isEmpty()) {
-            sb.append("<h3>Files Active</h3>").append(tableDomainHTML(new String[]{"Id", "Name", "Size"}, list, new String[]{"getId", "getName", "getSize"}));
+            sb.append("<h3>Files Active</h3>").append(tableDomainHTML(new String[]{"Id", "Name", "Size"}, list, new String[]{"getId", "getName", "getSizeReadable"}));
         }
         list = ServerDatabase.instance.selectFile(false);
         if (!list.isEmpty()) {
-            sb.append("<h3>Files Inactive</h3>").append(tableDomainHTML(new String[]{"Id", "Name", "Size"}, list, new String[]{"getId", "getName", "getSize"}));
+            sb.append("<h3>Files Inactive</h3>").append(tableDomainHTML(new String[]{"Id", "Name", "Size"}, list, new String[]{"getId", "getName", "getSizeReadable"}));
         }
         list = ServerDatabase.instance.selectSegment(null);
         if (!list.isEmpty()) {
             sb.append("<h3>Segments</h3>").append(tableDomainHTML(new String[]{"Id", "File Id", "Machine Id", "Byte From", "Byte To", "Size"}, list,
-                    new String[]{"getId", "getFileId", "getMachineId", "getByteFrom", "getByteTo", "getSize"}));
+                    new String[]{"getId", "getFileId", "getMachineId", "getByteFrom", "getByteTo", "getSizeReadable"}));
         }
         return sb.toString();
     }
@@ -113,7 +126,8 @@ public class HTMLCreator {
             sb.append("<tr>");
             for (String methodName : methodNames) {
                 try {
-                    sb.append("<td>").append(row.getClass().getMethod(methodName).invoke(row).toString()).append("</td>");
+                    Object value = row.getClass().getMethod(methodName).invoke(row);
+                    sb.append("<td>").append(value != null ? value.toString() : "").append("</td>");
                 } catch (IllegalAccessException e) {
                     e.printStackTrace();
                 } catch (InvocationTargetException e) {
@@ -129,7 +143,7 @@ public class HTMLCreator {
     }
 
     private static String tableAlgorithmHTML() {
-        StringBuilder sb = new StringBuilder("<table><thead><tr>");
+        StringBuilder sb = new StringBuilder("<h2>Algorithms</h2><table><thead><tr>");
         sb.append("<th>").append("Id").append("</th>");
         sb.append("<th>").append("Rozmiar danych").append("</th>");
         sb.append("<th>").append("Dystrybucja").append("</th>");

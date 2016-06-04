@@ -24,7 +24,7 @@ public class ConnectionManager implements NetworkInitializedListener {
 
     private void startServer() {
         ServerDatabase.init();
-        ServerDatabase.instance.deleteMachine(null);
+//        ServerDatabase.instance.deleteMachine(null);
         MachineHolder machineHolder = ClientDatabase.instance.selectMachine();
         ServerDatabase.instance.updateMachine(machineHolder);
         ConnectionServer connectionServer = new ConnectionServer();

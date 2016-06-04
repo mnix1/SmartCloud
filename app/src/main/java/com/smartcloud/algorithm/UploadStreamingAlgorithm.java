@@ -13,40 +13,40 @@ import com.smartcloud.util.FileManager;
 import com.smartcloud.web.NanoHTTPD;
 import com.smartcloud.web.WebServer;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.nio.charset.Charset;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
 
 public class UploadStreamingAlgorithm extends UploadAlgorithm {
-    private byte[] segment;
-    private int mSegmentSize;
+    private static SecureRandom random = new SecureRandom();
+
+    private long mSegmentSize;
     private boolean mUploadToMaster;
+    private List<String> usedMachineHoldersIds = new ArrayList<>();
 
     public UploadStreamingAlgorithm(NanoHTTPD.HTTPSession session) {
         super(session);
         mAlgorithm = Enum.valueOf(Algorithm.class, session.getParms().get("algorithm"));
         mUploadToMaster = Boolean.parseBoolean(session.getParms().get("uploadToMaster"));
-        if (mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITHOUT_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITH_MEM)) {
-            mSegmentSize = findRandomSegmentMaxSize();
-        } else if (mAlgorithm.equals(Algorithm.FIXED_BY_FILE_SIZE__EVERY)) {
-            double sizeForEachMachine = ((double) session.getBodySize()) / getAvailableMachines().size();
-            mSegmentSize = (int) Math.ceil(sizeForEachMachine);
-        } else {
-            mSegmentSize = Integer.parseInt(session.getParms().get("segmentMaxSize")) * 1024;
+        if (mAlgorithm.equals(Algorithm.FIXED__RANDOM_WITHOUT_MEM) || mAlgorithm.equals(Algorithm.FIXED__RANDOM_WITH_MEM)) {
+            mSegmentSize = Long.parseLong(session.getParms().get("segmentMaxSize")) * 1024;
         }
+    }
+
+    private int multipartHeaderDecode(byte[] buf) {
+        String header = new String(buf);
+        String patternFilename = "filename=\"";
+        String afterFilename = header.substring(header.indexOf(patternFilename) + patternFilename.length());
+        String filename = afterFilename.substring(0, afterFilename.indexOf("\""));
+        mSession.parms.put("file", filename);
+        String patternEnd = "\r\n\r\n";
+        return header.indexOf(patternEnd) + patternEnd.length();
     }
 
     public void perform() throws IOException, NanoHTTPD.ResponseException {
@@ -54,145 +54,115 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
         if (!NanoHTTPD.Method.POST.equals(mSession.method) || !contentType.isMultipart()) {
             return;
         }
-        segment = new byte[mSegmentSize];
-        int totalOffset = 0;
-        int totalSize = 0;
-        FileHolder fileHolder = null;
-        long size = mSession.getBodySize();
-        fileHolder = new FileHolder(size);
-        byte[] buf = new byte[WebServer.REQUEST_BUFFER_LEN];
-        mSession.rlen = mSession.inputStream.read(buf, 0, (int) Math.min(size, WebServer.REQUEST_BUFFER_LEN));
-        size -= mSession.rlen;
-        if (mSession.rlen > 0) {
-            int startOffset = decodeMultipartFormDataStart(contentType, buf, mSession.parms);
-            int length = decodeMultipartFormDataEnd(buf, mSession.parms.get("boundaryId"));
-            if (length >= 0) {
-                totalSize += length - startOffset;
-            } else {
-                totalSize += mSession.rlen - startOffset;
-            }
-            fileHolder.setName(mSession.parms.get("file"));
-            ServerDatabase.instance.insertFile(fileHolder);
-            totalOffset = segmentation(totalOffset, buf, startOffset, totalSize, fileHolder);
+        long bodySize = mSession.getBodySize();
+        int bufferSize = WebServer.REQUEST_BUFFER_LEN;
+        int headerEnd = 46;
+        if (bodySize < 2 * bufferSize) {
+            bufferSize *= 2;
         }
-        if (size > WebServer.REQUEST_BUFFER_LEN * 2) {
-            while (mSession.rlen >= 0 && size > WebServer.REQUEST_BUFFER_LEN * 2) {
-                mSession.rlen = mSession.inputStream.read(buf, 0, WebServer.REQUEST_BUFFER_LEN);
-                size -= mSession.rlen;
-                if (mSession.rlen > 0) {
-                    totalOffset = segmentation(totalOffset, buf, 0, mSession.rlen, fileHolder);
-                    totalSize += mSession.rlen;
-                }
-            }
+        byte[] buf = new byte[bufferSize];
+        mSession.rlen = mSession.inputStream.read(buf, 0, (int) Math.min(bodySize, buf.length));
+        int sizeOfHeaderStart = multipartHeaderDecode(buf);
+        final long fileSize = bodySize - sizeOfHeaderStart - headerEnd;
+        FileHolder fileHolder = new FileHolder(fileSize);
+        fileHolder.setName(mSession.parms.get("file"));
+        ServerDatabase.instance.insertFile(fileHolder);
+        if (mAlgorithm.equals(Algorithm.FIXED_BY_FILE_SIZE__EVERY)) {
+            double sizeForEachMachine = ((double) fileSize) / getAvailableMachines().size();
+            mSegmentSize = (int) Math.ceil(sizeForEachMachine);
         }
-        if (size > WebServer.REQUEST_BUFFER_LEN) {
-            mSession.rlen = mSession.inputStream.read(buf, 0, (int) size - WebServer.REQUEST_BUFFER_LEN);
-            size -= mSession.rlen;
-            if (mSession.rlen > 0) {
-                totalOffset = segmentation(totalOffset, buf, 0, mSession.rlen, fileHolder);
-                totalSize += mSession.rlen;
-            }
-        }
-        if (size > 0) {
-            mSession.rlen = mSession.inputStream.read(buf, 0, (int) WebServer.REQUEST_BUFFER_LEN);
-            size -= mSession.rlen;
-            if (mSession.rlen > 0) {
-                int length = decodeMultipartFormDataEnd(buf, mSession.parms.get("boundaryId"));
-                totalOffset = segmentation(totalOffset, buf, 0, length, fileHolder);
-                totalSize += length;
-            }
-        }
-        if (totalOffset % mSegmentSize > 0) {
-            SegmentHolder segmentHolder = new SegmentHolder(null, fileHolder.getId(), null, (long) totalSize - (totalOffset % mSegmentSize), (long) (totalSize));
-            saveSegmentData(Arrays.copyOf(segment, totalOffset % mSegmentSize), fileHolder, segmentHolder);
-        }
-        fileHolder.setSize((long) totalSize);
-        ServerDatabase.instance.updateFile(fileHolder);
-    }
-
-    private int segmentation(int totalOffset, byte[] buf, int offset, int length, FileHolder fileHolder) throws
-            IOException {
-        int segmentOffset = totalOffset % segment.length;
-        int size = segment.length - segmentOffset;
-        while (length > 0) {
-            int len = Math.min(length, size);
-            System.arraycopy(buf, offset, segment, segmentOffset, len);
-            length -= len;
-            offset += len;
-            segmentOffset = (segmentOffset + len) % segment.length;
-            size -= len;
-            totalOffset += len;
-            if (size == 0) {
-                SegmentHolder segmentHolder = new SegmentHolder(null, fileHolder.getId(), null, (long) totalOffset - segment.length, (long) (totalOffset));
-                saveSegmentData(Arrays.copyOf(segment, segment.length), fileHolder, segmentHolder);
-                size = segment.length;
-            }
-        }
-        return totalOffset;
-    }
-
-    private int decodeMultipartFormDataStart(NanoHTTPD.ContentType contentType, byte[] buf, Map<String, String> parms) throws NanoHTTPD.ResponseException, IOException {
-        int pcount = 0;
-        StringBuilder stringBuilder = new StringBuilder();
-        BufferedReader in =
-                new BufferedReader(new InputStreamReader(new ByteArrayInputStream(buf), Charset.forName(contentType.getEncoding())));
-        String mpline = in.readLine();
-        int offset = 0;
-        parms.put("boundaryId", mpline);
-        stringBuilder.append(mpline);
-        offset += 2;
-        if (mpline == null || !mpline.contains(contentType.getBoundary())) {
-            throw new NanoHTTPD.ResponseException(NanoHTTPD.Response.Status.BAD_REQUEST, "BAD REQUEST: Content type is multipart/form-data but chunk does not start with boundary.");
-        }
-
-        String partName = null, fileName = null;
-        mpline = in.readLine();
-        stringBuilder.append(mpline);
-        offset += 2;
-        while (mpline != null && mpline.trim().length() > 0) {
-            Matcher matcher = NanoHTTPD.CONTENT_DISPOSITION_PATTERN.matcher(mpline);
-            if (matcher.matches()) {
-                String attributeString = matcher.group(2);
-                matcher = NanoHTTPD.CONTENT_DISPOSITION_ATTRIBUTE_PATTERN.matcher(attributeString);
-                while (matcher.find()) {
-                    String key = matcher.group(1);
-                    if ("name".equalsIgnoreCase(key)) {
-                        partName = matcher.group(2);
-                    } else if ("filename".equalsIgnoreCase(key)) {
-                        fileName = matcher.group(2);
-                        // add these two line to support multiple
-                        // files uploaded using the same field Id
-                        if (!fileName.isEmpty()) {
-                            if (pcount > 0)
-                                partName = partName + String.valueOf(pcount++);
-                            else
-                                pcount++;
+        long toSend = fileSize;
+        int offset = sizeOfHeaderStart;
+        int length = mSession.rlen == buf.length ? (mSession.rlen - sizeOfHeaderStart) : (mSession.rlen - sizeOfHeaderStart - headerEnd);
+        while (mSession.rlen > 0 && toSend > 0) {
+            MachineHolder machineHolder = setup(fileSize);
+            SegmentHolder segmentHolder = new SegmentHolder(null, fileHolder.getId(), machineHolder.getId(), fileSize - toSend, Math.min(fileSize - toSend + mSegmentSize, fileSize));
+            ServerDatabase.instance.insertSegment(segmentHolder);
+            if (machineHolder.isServer()) {
+                long size = segmentHolder.getSize();
+                FileOutputStream fileOutputStream = null;
+                segmentHolder.setPath(FileManager.storageDir + "/" + fileHolder.getId() + "^_^" + segmentHolder.getId());
+                ClientDatabase.instance.insertSegment(segmentHolder);
+                try {
+                    File file = new File(segmentHolder.getPath());
+                    file.createNewFile();
+                    fileOutputStream = new FileOutputStream(file, false);
+                    fileOutputStream.write(buf, offset, length);
+                    size -= length;
+                    while (mSession.rlen > 0 && size > 0) {
+                        try {
+                            mSession.rlen = mSession.inputStream.read(buf, 0, Math.min((int) size, buf.length));
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        if (mSession.rlen > 0) {
+                            size -= mSession.rlen;
+                            fileOutputStream.write(buf, 0, mSession.rlen);
                         }
                     }
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } finally {
+                    try {
+                        fileOutputStream.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } else {
+                try {
+                    Task task = new MasterSendSegmentDataToSlaveTask(buf, offset, length, mSession, segmentHolder);
+                    new ClientCommunication(new Socket(InetAddress.getByName(machineHolder.getAddress()), ConnectionServer.SERVER_PORT), task).init();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
             }
-            mpline = in.readLine();
-            stringBuilder.append(mpline);
-            offset += 2;
+            toSend = Math.max(toSend - mSegmentSize, 0);
+            if (toSend > 0) {
+                mSession.rlen = mSession.inputStream.read(buf, 0, (int) Math.min(toSend, buf.length));
+                offset = 0;
+                length = mSession.rlen == buf.length ? mSession.rlen : mSession.rlen - headerEnd;
+            }
         }
-        if (fileName != null) {
-            parms.put(partName, fileName);
-        }
-        return stringBuilder.length() + offset;
-    }
-
-    private int decodeMultipartFormDataEnd(byte[] buf, String boundaryId) throws NanoHTTPD.ResponseException {
-        try {
-            String data = new String(buf);
-            return data.lastIndexOf(boundaryId) - 2;
-        } catch (Exception e) {
-            throw new NanoHTTPD.ResponseException(NanoHTTPD.Response.Status.INTERNAL_ERROR, e.toString());
+        if(bufferSize == WebServer.REQUEST_BUFFER_LEN){
+            mSession.rlen = mSession.inputStream.read(buf, 0, (int) (bodySize - sizeOfHeaderStart - fileSize));
         }
     }
 
-    private static SecureRandom random = new SecureRandom();
+    private MachineHolder setup(long fileSize) {
+        MachineHolder machineHolder = getMachine();
+        if (mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITHOUT_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITH_MEM)) {
+            mSegmentSize = findRandomSegmentMaxSize();
+        } else if (mAlgorithm.equals(Algorithm.BY_CAPACITY__BY_CAPACITY)) {
+            mSegmentSize = machineHolder.getFreeSpace().intValue() - 1024;//zapas 1KB
+        } else if (mAlgorithm.equals(Algorithm.BY_CAPACITY_AND_FILE_SIZE__EVERY)) {
+            long totalFreeSpace = 0;
+            for (MachineHolder machine : getAvailableMachines()) {
+                totalFreeSpace += machine.getFreeSpace();
+            }
+            mSegmentSize = (int) Math.ceil((double) fileSize * machineHolder.getFreeSpace() / totalFreeSpace);
+        }
+        return machineHolder;
+    }
 
-    private List<String> usedMachineHoldersIds = new ArrayList<>();
+    private MachineHolder getMachine() {
+        MachineHolder machineHolder = null;
+        if (mAlgorithm.equals(Algorithm.FIXED__RANDOM_WITHOUT_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITHOUT_MEM)) {
+            machineHolder = findRandomMachine(false);
+        } else if (mAlgorithm.equals(Algorithm.FIXED__RANDOM_WITH_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITH_MEM) ||
+                mAlgorithm.equals(Algorithm.FIXED_BY_FILE_SIZE__EVERY) || mAlgorithm.equals(Algorithm.BY_CAPACITY_AND_FILE_SIZE__EVERY)) {
+            machineHolder = findRandomMachine(true);
+        } else if (mAlgorithm.equals(Algorithm.BY_CAPACITY__BY_CAPACITY)) {
+            for (MachineHolder availableMachine : getAvailableMachines()) {
+                if (machineHolder == null || availableMachine.getFreeSpace() > machineHolder.getFreeSpace()) {
+                    machineHolder = availableMachine;
+                }
+            }
+        }
+        return machineHolder;
+    }
 
     private List<MachineHolder> getAvailableMachines() {
         List<MachineHolder> machines = ServerDatabase.instance.selectMachine(true);
@@ -232,50 +202,6 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
             usedMachineHoldersIds.add(machineHolder.getId());
         }
         return machineHolder;
-    }
-
-    private void saveSegmentData(byte[] data, FileHolder fileHolder, SegmentHolder segmentHolder) {
-        MachineHolder machineHolder = null;
-        if (mAlgorithm.equals(Algorithm.FIXED__RANDOM_WITHOUT_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITHOUT_MEM)) {
-            machineHolder = findRandomMachine(false);
-        } else if (mAlgorithm.equals(Algorithm.FIXED__RANDOM_WITH_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITH_MEM) || mAlgorithm.equals(Algorithm.FIXED_BY_FILE_SIZE__EVERY)) {
-            machineHolder = findRandomMachine(true);
-        }
-        segmentHolder.setMachineId(machineHolder.getId());
-        ServerDatabase.instance.insertSegment(segmentHolder);
-        if (machineHolder.isServer()) {
-            FileOutputStream fileOutputStream = null;
-            segmentHolder.setPath(FileManager.storageDir + "/" + fileHolder.getId() + "^_^" + segmentHolder.getId());
-            ClientDatabase.instance.insertSegment(segmentHolder);
-            try {
-                File file = new File(segmentHolder.getPath());
-                file.createNewFile();
-                fileOutputStream = new FileOutputStream(file, false);
-                fileOutputStream.write(data);
-                segmentHolder.setReady(true);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                try {
-                    fileOutputStream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        } else {
-            try {
-                Task task = new MasterSendSegmentDataToSlaveTask(data, segmentHolder);
-                new ClientCommunication(new Socket(InetAddress.getByName(machineHolder.getAddress()), ConnectionServer.SERVER_PORT), task).init();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        if (mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITHOUT_MEM) || mAlgorithm.equals(Algorithm.RANDOM__RANDOM_WITH_MEM)) {
-            mSegmentSize = findRandomSegmentMaxSize();
-            segment = new byte[mSegmentSize];
-        }
     }
 
     private int findRandomSegmentMaxSize() {

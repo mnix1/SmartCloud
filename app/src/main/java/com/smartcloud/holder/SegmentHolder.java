@@ -1,5 +1,7 @@
 package com.smartcloud.holder;
 
+import com.smartcloud.util.Util;
+
 import java.io.Serializable;
 
 public class SegmentHolder implements Serializable {
@@ -14,7 +16,6 @@ public class SegmentHolder implements Serializable {
     private Long byteFrom;
     private Long byteTo;
     private String path;
-    private boolean ready;
 
     public SegmentHolder(Long id) {
         this.id = id;
@@ -77,6 +78,10 @@ public class SegmentHolder implements Serializable {
         return byteTo - byteFrom;
     }
 
+    public String getSizeReadable() {
+        return Util.sizeToReadableUnit(getSize());
+    }
+
     public String getPath() {
         return path;
     }
@@ -85,13 +90,6 @@ public class SegmentHolder implements Serializable {
         this.path = path;
     }
 
-    public boolean isReady() {
-        return ready;
-    }
-
-    public void setReady(boolean ready) {
-        this.ready = ready;
-    }
 
     @Override
     public boolean equals(Object o) {

@@ -4,13 +4,16 @@ import com.smartcloud.constant.MachineRole;
 import com.smartcloud.database.ClientDatabase;
 import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.util.FileManager;
+import com.smartcloud.util.Util;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.UUID;
 
 public class MachineHolder implements Serializable {
     private static final long serialVersionUID = 1L;
+    private final static SimpleDateFormat lastContactFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     public final static String TABLE_NAME = "machine";
     public final static String TABLE_COLUMNS_CLIENT = "(id VARCHAR PRIMARY KEY, machineRole VARCHAR, active NUMBER)";
     public final static String TABLE_COLUMNS_SERVER = "(id VARCHAR PRIMARY KEY, machineRole VARCHAR, address VARCHAR, freeSpace NUMBER, totalSpace NUMBER, active NUMBER, lastContact NUMBER)";
@@ -53,7 +56,7 @@ public class MachineHolder implements Serializable {
         this.lastContact = lastContact;
     }
 
-    public static void updateFromSlave(MachineHolder machineHolder, String address){
+    public static void updateFromSlave(MachineHolder machineHolder, String address) {
         machineHolder.setActive(true);
         machineHolder.setAddress(address);
         machineHolder.setLastContact(new Date());
@@ -103,6 +106,9 @@ public class MachineHolder implements Serializable {
     public Long getFreeSpace() {
         return freeSpace;
     }
+    public String getFreeSpaceReadable() {
+        return Util.sizeToReadableUnit(getFreeSpace());
+    }
 
     public void setFreeSpace(Long freeSpace) {
         this.freeSpace = freeSpace;
@@ -110,6 +116,9 @@ public class MachineHolder implements Serializable {
 
     public Long getTotalSpace() {
         return totalSpace;
+    }
+    public String getTotalSpaceReadable() {
+        return Util.sizeToReadableUnit(getTotalSpace());
     }
 
     public void setTotalSpace(Long totalSpace) {
@@ -141,6 +150,10 @@ public class MachineHolder implements Serializable {
 
     public Date getLastContact() {
         return lastContact;
+    }
+
+    public String getLastContactFormat() {
+        return lastContactFormat.format(lastContact);
     }
 
     public void setLastContact(Date lastContact) {

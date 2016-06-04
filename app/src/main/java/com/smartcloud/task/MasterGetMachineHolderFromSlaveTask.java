@@ -18,8 +18,7 @@ import java.util.Map;
 
 public class MasterGetMachineHolderFromSlaveTask extends Task {
     private static final int LAST_CONTACT_TRESHHOLD = 100;
-    private static final int NOT_RESPONDING_TRESHHOLD = 10000;
-
+    private static final int NOT_RESPONDING_TRESHHOLD = 1000;
 
     private MachineHolder mSlaveMachineHolder;
 
@@ -38,13 +37,14 @@ public class MasterGetMachineHolderFromSlaveTask extends Task {
                 machineHolder = ClientDatabase.instance.selectMachine();
                 ServerDatabase.instance.updateMachine(machineHolder);
             } else {
+                if (!machineHolder.isActive()) {
+                    continue;
+                }
                 MasterGetMachineHolderFromSlaveTask task = null;
                 try {
                     task = new MasterGetMachineHolderFromSlaveTask();
-                    if (machineHolder.getAddress() != null) {
-                        machineHolderTasks.put(machineHolder, task);
-                        new ClientCommunication(new Socket(InetAddress.getByName(machineHolder.getAddress()), ConnectionServer.SERVER_PORT), task).init();
-                    }
+                    machineHolderTasks.put(machineHolder, task);
+                    new ClientCommunication(new Socket(InetAddress.getByName(machineHolder.getAddress()), ConnectionServer.SERVER_PORT), task).init();
                 } catch (IOException e) {
                     machineHolderTasks.remove(task);
                     machineHolder.setActive(false);
