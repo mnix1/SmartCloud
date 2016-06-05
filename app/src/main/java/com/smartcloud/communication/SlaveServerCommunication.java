@@ -7,6 +7,7 @@ import com.smartcloud.task.TaskType;
 import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.List;
 
 public class SlaveServerCommunication extends ServerCommunication {
 
@@ -31,7 +32,7 @@ public class SlaveServerCommunication extends ServerCommunication {
                 getSegmentData();
                 break;
             case MASTER_REQUEST_DELETE_SEGMENT_TO_SLAVE:
-                deleteSegment();
+                deleteSegments();
                 break;
             default:
                 break;
@@ -47,17 +48,15 @@ public class SlaveServerCommunication extends ServerCommunication {
         }
     }
 
-    void deleteSegment() {
-        try {
-            Long segmentId = Long.parseLong(mInput.readLine());
+    void deleteSegments() {
+        List<Long> segmentIds = (List<Long>) receiveObject();
+        for (Long segmentId : segmentIds) {
             SegmentHolder segmentHolder = ClientDatabase.instance.selectSegment(segmentId);
             if (segmentHolder == null) {
                 return;
             }
             ClientDatabase.instance.deleteSegment(segmentHolder);
             new File(segmentHolder.getPath()).delete();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 }

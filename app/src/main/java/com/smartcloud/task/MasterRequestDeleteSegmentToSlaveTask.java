@@ -4,15 +4,17 @@ import com.smartcloud.constant.SynchronizationMode;
 import com.smartcloud.database.ClientDatabase;
 import com.smartcloud.holder.SegmentHolder;
 
+import java.util.List;
+
 public class MasterRequestDeleteSegmentToSlaveTask extends Task {
-    private Long mSegmentHolderId;
-    public MasterRequestDeleteSegmentToSlaveTask(Long segmentHolderId) {
+    private List<Long> mSegmentHolderIds;
+    public MasterRequestDeleteSegmentToSlaveTask(List<Long> segmentIds) {
         super(TaskType.MASTER_REQUEST_DELETE_SEGMENT_TO_SLAVE, SynchronizationMode.ASYNCHRONOUS);
-        this.mSegmentHolderId = segmentHolderId;
+        this.mSegmentHolderIds = segmentIds;
     }
 
     @Override
     public void perform() {
-        communicationManager.getOutput().println(mSegmentHolderId);
+        communicationManager.sendObject(mSegmentHolderIds);
     }
 }

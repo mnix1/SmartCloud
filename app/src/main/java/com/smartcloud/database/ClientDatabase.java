@@ -117,7 +117,11 @@ public class ClientDatabase extends Database {
     }
 
     public int deleteSegment(SegmentHolder segmentHolder) {
-        return mDatabase.delete(SegmentHolder.TABLE_NAME, "id = ?", new String[]{segmentHolder.getId().toString()});
+        return deleteSegment(segmentHolder.getId());
+    }
+
+    public int deleteSegment(Long segmentId) {
+        return mDatabase.delete(SegmentHolder.TABLE_NAME, "id = ?", new String[]{segmentId.toString()});
     }
 
     public boolean updateMachine(MachineHolder machineHolder) {

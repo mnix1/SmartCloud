@@ -13,7 +13,10 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class FileHolder implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -36,17 +39,29 @@ public class FileHolder implements Serializable {
     }
 
     public static void deleteFile(Long fileId) {
+        Map<String, List<Long>> map = new HashMap<String, List<Long>>();
         for (SegmentHolder segmentHolder : ServerDatabase.instance.selectSegment(fileId)) {
-            MachineHolder machineHolder = ServerDatabase.instance.selectMachine(segmentHolder.getMachineId());
+            if (map.containsKey(segmentHolder.getMachineId())) {
+                map.get(segmentHolder.getMachineId()).add(segmentHolder.getId());
+            } else {
+                List<Long> segmentIds = new ArrayList<Long>();
+                segmentIds.add(segmentHolder.getId());
+                map.put(segmentHolder.getMachineId(), segmentIds);
+            }
+        }
+        for (String machineId : map.keySet()) {
+            MachineHolder machineHolder = ServerDatabase.instance.selectMachine(machineId);
             if (machineHolder == null || !machineHolder.isActive()) {
                 continue;
             }
             if (machineHolder.isServer()) {
-                new File(ClientDatabase.instance.selectSegment(segmentHolder.getId()).getPath()).delete();
-                ClientDatabase.instance.deleteSegment(segmentHolder);
+                for (Long segmentId : map.get(machineId)) {
+                    new File(ClientDatabase.instance.selectSegment(segmentId).getPath()).delete();
+                    ClientDatabase.instance.deleteSegment(segmentId);
+                }
             } else {
                 try {
-                    Task task = new MasterRequestDeleteSegmentToSlaveTask(segmentHolder.getId());
+                    Task task = new MasterRequestDeleteSegmentToSlaveTask(map.get(machineId));
                     new ClientCommunication(new Socket(InetAddress.getByName(machineHolder.getAddress()), ConnectionServer.SERVER_PORT), task).init();
                 } catch (IOException e) {
                     machineHolder.setActive(false);
