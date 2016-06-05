@@ -1,5 +1,6 @@
 package com.smartcloud.holder;
 
+import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.util.Util;
 
 import java.io.Serializable;
@@ -75,7 +76,7 @@ public class SegmentHolder implements Serializable {
     }
 
     public Long getSize() {
-        return byteTo - byteFrom;
+        return byteTo - byteFrom + 1;
     }
 
     public String getSizeReadable() {
@@ -90,6 +91,9 @@ public class SegmentHolder implements Serializable {
         this.path = path;
     }
 
+    public boolean isActive() {
+        return ServerDatabase.instance.selectMachine(getMachineId()).isActive();
+    }
 
     @Override
     public boolean equals(Object o) {

@@ -139,19 +139,6 @@ public class ServerDatabase extends Database {
         return machines;
     }
 
-//    public List<MachineHolder> selectMachine(Long fileId) {
-//        Cursor cursor = mDatabase.rawQuery("SELECT m.id as id, m.machineRole as machineRole, m.address as address , m.active as active FROM " + MachineHolder.TABLE_NAME + " m, " +
-//                SegmentHolder.TABLE_NAME + " s WHERE m.id = s.machineId AND s.fileId = " + fileId, null);
-//        List<MachineHolder> machines = new ArrayList<>(cursor.getCount());
-//        while (cursor.moveToNext()) {
-//            MachineRole machineRole = Enum.valueOf(MachineRole.class, cursor.getString(cursor.getColumnIndex("machineRole")));
-//            machines.add(new MachineHolder(cursor.getString(cursor.getColumnIndex("id")), machineRole, cursor.getString(cursor.getColumnIndex("address")),
-//                    null, null, cursor.getInt(cursor.getColumnIndex("active")), null));
-//        }
-//        cursor.close();
-//        return machines;
-//    }
-
     public Long selectFreeSpace() {
         Cursor cursor = mDatabase.rawQuery("SELECT SUM(freeSpace) as freeSpace FROM " + MachineHolder.TABLE_NAME + " WHERE active = 1", null);
         cursor.moveToFirst();
@@ -175,36 +162,19 @@ public class ServerDatabase extends Database {
         return fileHolder;
     }
 
-    public List<FileHolder> selectFile(Boolean active) {
-        Cursor cursor = null;
-        if (active == null) {
-            cursor = mDatabase.query(FileHolder.TABLE_NAME, new String[]{"id", "name", "size"}, null, null, null, null, null);
-        } else if (active) {
-            cursor = mDatabase.rawQuery("SELECT o.id as id, o.name as name, o.size as size FROM " +
-                    FileHolder.TABLE_NAME + " o WHERE o.id NOT IN (SELECT DISTINCT f.id FROM " +
-                    FileHolder.TABLE_NAME + " f, " + MachineHolder.TABLE_NAME + " m, " + SegmentHolder.TABLE_NAME +
-                    " s WHERE f.id = s.fileId AND ((s.machineId = m.id AND m.active = 0) OR (s.machineId NOT IN (SELECT DISTINCT id FROM " + MachineHolder.TABLE_NAME + "))))", null);
-        } else {
-            cursor = mDatabase.rawQuery("SELECT DISTINCT f.id as id, f.name as name, f.size as size FROM " + FileHolder.TABLE_NAME + " f, " +
-                    MachineHolder.TABLE_NAME + " m, " + SegmentHolder.TABLE_NAME +
-                    " s WHERE f.id = s.fileId AND ((s.machineId = m.id AND m.active = 0) OR (s.machineId NOT IN (SELECT DISTINCT id FROM " + MachineHolder.TABLE_NAME + ")))", null);
-        }
+    public List<FileHolder> selectFile() {
+        Cursor cursor = mDatabase.query(FileHolder.TABLE_NAME, new String[]{"id", "name", "size"}, null, null, null, null, null);
         List<FileHolder> files = new ArrayList<>(cursor.getCount());
         while (cursor.moveToNext()) {
-            files.add(new FileHolder(cursor.getLong(cursor.getColumnIndex("id")), cursor.getString(cursor.getColumnIndex("name")), cursor.getLong(cursor.getColumnIndex("size"))));
+            FileHolder fileHolder = new FileHolder(cursor.getLong(cursor.getColumnIndex("id")), cursor.getString(cursor.getColumnIndex("name")), cursor.getLong(cursor.getColumnIndex("size")));
+            files.add(fileHolder);
         }
         cursor.close();
         return files;
     }
 
-    public List<FileHolder> selectFile() {
-        return selectFile((Boolean) null);
-    }
-
-    public List<SegmentHolder> selectSegment(Long fileId) {
-        Cursor cursor = fileId == null ? mDatabase.query(SegmentHolder.TABLE_NAME, new String[]{"id", "fileId", "machineId", "byteFrom", "byteTo"},
-                null, null, null, null, null) :
-                mDatabase.rawQuery("SELECT id, fileId, machineId, byteFrom, byteTo FROM " + SegmentHolder.TABLE_NAME + " WHERE fileId = " + fileId + " ORDER BY byteFrom", null);
+    public List<SegmentHolder> selectSegment(String machineId) {
+        Cursor cursor = mDatabase.rawQuery("SELECT id, fileId, machineId, byteFrom, byteTo FROM " + SegmentHolder.TABLE_NAME + " WHERE machineId = '" + machineId + "' ORDER BY byteFrom", null);
         List<SegmentHolder> segments = new ArrayList<>(cursor.getCount());
         while (cursor.moveToNext()) {
             segments.add(new SegmentHolder(cursor.getLong(cursor.getColumnIndex("id")),
@@ -217,6 +187,36 @@ public class ServerDatabase extends Database {
         return segments;
     }
 
+    public List<SegmentHolder> selectSegment(Long fileId) {
+        Cursor cursor = mDatabase.rawQuery("SELECT id, fileId, machineId, byteFrom, byteTo FROM " + SegmentHolder.TABLE_NAME + " WHERE fileId = " + fileId + " ORDER BY byteFrom", null);
+        List<SegmentHolder> segments = new ArrayList<>(cursor.getCount());
+        while (cursor.moveToNext()) {
+            segments.add(new SegmentHolder(cursor.getLong(cursor.getColumnIndex("id")),
+                    cursor.getLong(cursor.getColumnIndex("fileId")),
+                    cursor.getString(cursor.getColumnIndex("machineId")),
+                    cursor.getLong(cursor.getColumnIndex("byteFrom")),
+                    cursor.getLong(cursor.getColumnIndex("byteTo"))));
+        }
+        cursor.close();
+        return segments;
+    }
+
+    public List<SegmentHolder> selectSegment() {
+        Cursor cursor = mDatabase.query(SegmentHolder.TABLE_NAME, new String[]{"id", "fileId", "machineId", "byteFrom", "byteTo"},
+                null, null, null, null, null);
+        List<SegmentHolder> segments = new ArrayList<>(cursor.getCount());
+        while (cursor.moveToNext()) {
+            segments.add(new SegmentHolder(cursor.getLong(cursor.getColumnIndex("id")),
+                    cursor.getLong(cursor.getColumnIndex("fileId")),
+                    cursor.getString(cursor.getColumnIndex("machineId")),
+                    cursor.getLong(cursor.getColumnIndex("byteFrom")),
+                    cursor.getLong(cursor.getColumnIndex("byteTo"))));
+        }
+        cursor.close();
+        return segments;
+    }
+
+
     public int deleteMachine(String machineId) {
         return machineId == null ? mDatabase.delete(MachineHolder.TABLE_NAME, null, null) :
                 mDatabase.delete(MachineHolder.TABLE_NAME, "id = ?", new String[]{machineId});
@@ -228,6 +228,16 @@ public class ServerDatabase extends Database {
 
     public int deleteSegments(Long fileId) {
         return mDatabase.delete(SegmentHolder.TABLE_NAME, "fileId = ?", new String[]{fileId.toString()});
+    }
+
+    public int deleteSegment(Long segmentId) {
+        return mDatabase.delete(SegmentHolder.TABLE_NAME, "id = ?", new String[]{segmentId.toString()});
+    }
+
+    public void deleteSegments(List<SegmentHolder> segmentsNotActive) {
+        for (SegmentHolder segmentHolder : segmentsNotActive) {
+            deleteSegment(segmentHolder.getId());
+        }
     }
 
     public boolean updateMachine(MachineHolder machineHolder) {

@@ -5,10 +5,8 @@ import android.util.Base64;
 import com.smartcloud.constant.SynchronizationMode;
 import com.smartcloud.holder.SegmentHolder;
 import com.smartcloud.web.NanoHTTPD;
-import com.smartcloud.web.WebServer;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintWriter;
 
 public class MasterSendSegmentDataToSlaveTask extends Task {
@@ -46,6 +44,5 @@ public class MasterSendSegmentDataToSlaveTask extends Task {
                 output.println(new String(Base64.encode(mData, 0, mSession.rlen, Base64.NO_WRAP)));
             }
         }
-//        communicationManager.sendSegmentData(mData, mSegmentHolder);
     }
 }

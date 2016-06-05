@@ -76,7 +76,7 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
         int length = mSession.rlen == buf.length ? (mSession.rlen - sizeOfHeaderStart) : (mSession.rlen - sizeOfHeaderStart - headerEnd);
         while (mSession.rlen > 0 && toSend > 0) {
             MachineHolder machineHolder = setup(fileSize);
-            SegmentHolder segmentHolder = new SegmentHolder(null, fileHolder.getId(), machineHolder.getId(), fileSize - toSend, Math.min(fileSize - toSend + mSegmentSize, fileSize));
+            SegmentHolder segmentHolder = new SegmentHolder(null, fileHolder.getId(), machineHolder.getId(), fileSize - toSend, Math.min(fileSize - toSend + mSegmentSize - 1, fileSize - 1));
             ServerDatabase.instance.insertSegment(segmentHolder);
             if (machineHolder.isServer()) {
                 long size = segmentHolder.getSize();
@@ -126,7 +126,7 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
                 length = mSession.rlen == buf.length ? mSession.rlen : mSession.rlen - headerEnd;
             }
         }
-        if(bufferSize == WebServer.REQUEST_BUFFER_LEN){
+        if (bufferSize == WebServer.REQUEST_BUFFER_LEN) {
             mSession.rlen = mSession.inputStream.read(buf, 0, (int) (bodySize - sizeOfHeaderStart - fileSize));
         }
     }

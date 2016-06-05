@@ -9,6 +9,9 @@ import com.smartcloud.MainActivity;
 import com.smartcloud.holder.MachineHolder;
 import com.smartcloud.holder.SegmentHolder;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ClientDatabase extends Database {
     public static final String DB_NAME_CLIENT = "SmartCloudClientDb";
     public static ClientDatabase instance;
@@ -89,13 +92,24 @@ public class ClientDatabase extends Database {
 
     public SegmentHolder selectSegment(Long id) {
         Cursor cursor = mDatabase.rawQuery("SELECT path FROM " + SegmentHolder.TABLE_NAME + " WHERE id = " + id, null);
-        //mDatabase.query(SegmentHolder.TABLE_NAME, new String[]{"path"}, "id = ?s", new String[]{id.toString()}, null, null, null);
         if (!cursor.moveToFirst()) {
             return null;
         }
         String path = cursor.getString(cursor.getColumnIndex("path"));
         cursor.close();
         return new SegmentHolder(id, path);
+    }
+
+    public List<SegmentHolder> selectSegment() {
+        Cursor cursor = mDatabase.query(SegmentHolder.TABLE_NAME, new String[]{"id", "path"},
+                null, null, null, null, null);
+        List<SegmentHolder> segments = new ArrayList<>(cursor.getCount());
+        while (cursor.moveToNext()) {
+            segments.add(new SegmentHolder(cursor.getLong(cursor.getColumnIndex("id")),
+                    cursor.getString(cursor.getColumnIndex("path"))));
+        }
+        cursor.close();
+        return segments;
     }
 
     public int deleteMachine(MachineHolder machineHolder) {

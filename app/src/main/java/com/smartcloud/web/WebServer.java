@@ -33,9 +33,14 @@ public class WebServer extends NanoHTTPD {
     public Response serve(IHTTPSession session) {
         Method method = session.getMethod();
         String uri = session.getUri();
+        if (Method.GET.equals(method) && uri.equals("/")) {
+            MasterGetMachineHolderFromSlaveTask.updateMachines();
+            return newFixedLengthResponse(HTMLCreator.createResponseHTML());
+        }
         if (Method.PUT.equals(method) || Method.POST.equals(method)) {
             try {
                 new UploadStreamingAlgorithm((HTTPSession) session).perform();
+                return redirect();
             } catch (IOException ioe) {
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, NanoHTTPD.MIME_PLAINTEXT, "SERVER INTERNAL ERROR: IOException: " + ioe.getMessage());
             } catch (ResponseException re) {
@@ -47,9 +52,15 @@ public class WebServer extends NanoHTTPD {
         } else if (Method.GET.equals(method) && uri.contains("/deleteFileId=")) {
             Long fileId = Long.parseLong(uri.replace("/deleteFileId=", ""));
             FileHolder.deleteFile(fileId);
+            return redirect();
         }
-        MasterGetMachineHolderFromSlaveTask.updateMachines();
-        return newFixedLengthResponse(HTMLCreator.createResponseHTML());
+        return newFixedLengthResponse("Smart Cloud");
+    }
+
+    public static Response redirect() {
+        Response res = newFixedLengthResponse(Response.Status.REDIRECT, NanoHTTPD.MIME_HTML, HTMLCreator.createResponseHTML());
+        res.addHeader("Location", "/");
+        return res;
     }
 
     public static Response newFixedLengthResponse(Response.IStatus status, String mimeType, String message) {

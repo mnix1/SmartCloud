@@ -6,7 +6,9 @@ import com.smartcloud.database.ClientDatabase;
 import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.holder.MachineHolder;
 import com.smartcloud.network.NetworkInitializedListener;
+import com.smartcloud.task.SlaveRequestActiveSlaveSegmentToMasterTask;
 import com.smartcloud.task.SlaveSendMachineHolderToMasterTask;
+import com.smartcloud.util.FileManager;
 import com.smartcloud.web.WebServer;
 
 public class ConnectionManager implements NetworkInitializedListener {
@@ -32,6 +34,8 @@ public class ConnectionManager implements NetworkInitializedListener {
         mServerThread.start();
         mWebServer = new WebServer();
         mWebServer.start();
+        FileManager.checkConsistency();
+        ServerDatabase.instance.deleteSegments(FileManager.checkConsistency(ServerDatabase.instance.selectSegment(machineHolder.getId())));
     }
 
     private void startClient() {
@@ -40,6 +44,8 @@ public class ConnectionManager implements NetworkInitializedListener {
             mServerThread = new Thread(connectionServer);
             mServerThread.start();
             new ClientCommunication(new SlaveSendMachineHolderToMasterTask()).init();
+            new ClientCommunication(new SlaveRequestActiveSlaveSegmentToMasterTask()).init();
+            FileManager.checkConsistency();
         } catch (Exception e) {
             e.printStackTrace();
         }

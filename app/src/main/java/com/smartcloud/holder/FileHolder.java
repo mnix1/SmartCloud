@@ -13,28 +13,17 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.List;
 
 public class FileHolder implements Serializable {
     private static final long serialVersionUID = 1L;
     public final static String TABLE_NAME = "file";
-    public final static String TABLE_COLUMNS_SERVER = "(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR, size NUMBER)";
+    public final static String TABLE_COLUMNS_SERVER = "(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR, size NUMBER, status VARCHAR)";
 
     private Long id;
     private String name;
     private Long size;
     private File file;
-
-    public FileHolder(File file) {
-        this.file = file;
-        this.name = file.getName();
-        this.size = file.length();
-    }
-
-    public FileHolder(Long id, File file) {
-        this.id = id;
-        this.file = file;
-        this.size = file.length();
-    }
 
     public FileHolder(Long id, String name, Long size) {
         this.id = id;
@@ -105,5 +94,29 @@ public class FileHolder implements Serializable {
 
     public void setFile(File file) {
         this.file = file;
+    }
+
+    public boolean isAvailable() {
+        List<SegmentHolder> segments = ServerDatabase.instance.selectSegment(getId());
+        if (segments.isEmpty() || segments.get(0).getByteFrom() > 0) {
+            return false;
+        }
+        long segmentTo = segments.get(0).getByteTo();
+        for (int i = 1; i < segments.size(); i++) {
+            SegmentHolder segmentHolder = segments.get(i);
+            if (segmentTo >= segmentHolder.getByteFrom() - 1 && segmentTo < segmentHolder.getByteTo()) {
+                segmentTo = segmentHolder.getByteTo();
+            }
+        }
+        return segmentTo == getSize() - 1;
+    }
+
+    public boolean isActive() {
+        for (SegmentHolder segmentHolder : ServerDatabase.instance.selectSegment(getId())) {
+            if (!segmentHolder.isActive()) {
+                return false;
+            }
+        }
+        return true;
     }
 }
