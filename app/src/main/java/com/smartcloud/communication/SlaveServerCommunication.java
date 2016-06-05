@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.List;
+import java.util.Map;
 
 public class SlaveServerCommunication extends ServerCommunication {
 
@@ -23,29 +24,32 @@ public class SlaveServerCommunication extends ServerCommunication {
                 sendObject(ClientDatabase.instance.selectMachine());
                 break;
             case MASTER_SEND_SEGMENT_DATA_TO_SLAVE:
-                SegmentHolder segmentHolder = receiveSegmentDataAndSaveAsFile();
-                if (segmentHolder != null) {
-                    ClientDatabase.instance.insertSegment(segmentHolder);
-                }
+                getSegmentDataAndSaveAsFile(this, null);
                 break;
             case MASTER_GET_SEGMENT_DATA_FROM_SLAVE_AND_WRITE_TO_STREAM:
-                getSegmentData();
+                sendSegmentData();
                 break;
             case MASTER_REQUEST_DELETE_SEGMENT_TO_SLAVE:
                 deleteSegments();
+                break;
+            case MASTER_REQUEST_SLAVE_GET_SEGMENT:
+                requestAndGetSegmentData();
+                break;
+            case MACHINE_GET_SEGMENT_FROM_MACHINE_AND_WRITE_TO_FILE:
+                List<Long> mSegmentIds = (List<Long>) receiveObject();
+                for (Long segmentId : mSegmentIds) {
+                    sendSegmentFromFile(ClientDatabase.instance.selectSegment(segmentId));
+                }
                 break;
             default:
                 break;
         }
     }
 
-    void getSegmentData() {
-        try {
-            Long segmentId = Long.parseLong(mInput.readLine());
-            sendSegmentFromFile(ClientDatabase.instance.selectSegment(segmentId));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    void requestAndGetSegmentData() {
+        Map<String, List<Long>> machineAddressListSegmentIds = (Map<String, List<Long>>) receiveObject();
+        Map<Long, Long> oldNewSegmentId = (Map<Long, Long>) receiveObject();
+        requestAndGetSegmentData(machineAddressListSegmentIds, oldNewSegmentId);
     }
 
     void deleteSegments() {
@@ -57,6 +61,14 @@ public class SlaveServerCommunication extends ServerCommunication {
             }
             ClientDatabase.instance.deleteSegment(segmentHolder);
             new File(segmentHolder.getPath()).delete();
+        }
+    }
+    public void sendSegmentData() {
+        try {
+            Long segmentId = Long.parseLong(mInput.readLine());
+            sendSegmentFromFile(ClientDatabase.instance.selectSegment(segmentId));
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }

@@ -2,6 +2,8 @@ package com.smartcloud.algorithm;
 
 import com.smartcloud.communication.ClientCommunication;
 import com.smartcloud.connection.ConnectionServer;
+import com.smartcloud.constant.Algorithm;
+import com.smartcloud.constant.Redundancy;
 import com.smartcloud.database.ClientDatabase;
 import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.holder.FileHolder;
@@ -10,6 +12,7 @@ import com.smartcloud.holder.SegmentHolder;
 import com.smartcloud.task.MasterSendSegmentDataToSlaveTask;
 import com.smartcloud.task.Task;
 import com.smartcloud.util.FileManager;
+import com.smartcloud.util.Util;
 import com.smartcloud.web.NanoHTTPD;
 import com.smartcloud.web.WebServer;
 
@@ -19,23 +22,20 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 
 public class UploadStreamingAlgorithm extends UploadAlgorithm {
-    private static SecureRandom random = new SecureRandom();
-
     private long mSegmentSize;
     private boolean mUploadToMaster;
     private List<String> usedMachineHoldersIds = new ArrayList<>();
 
     public UploadStreamingAlgorithm(NanoHTTPD.HTTPSession session) {
         super(session);
-        mAlgorithm = Enum.valueOf(Algorithm.class, session.getParms().get("algorithm"));
-        mUploadToMaster = Boolean.parseBoolean(session.getParms().get("uploadToMaster"));
+        this.mAlgorithm = Enum.valueOf(Algorithm.class, session.getParms().get("algorithm"));
+        this.mUploadToMaster = Boolean.parseBoolean(session.getParms().get("uploadToMaster"));
         if (mAlgorithm.equals(Algorithm.FIXED__RANDOM_WITHOUT_MEM) || mAlgorithm.equals(Algorithm.FIXED__RANDOM_WITH_MEM)) {
-            mSegmentSize = Long.parseLong(session.getParms().get("segmentMaxSize")) * 1024;
+            this.mSegmentSize = Long.parseLong(session.getParms().get("segmentMaxSize")) * 1024;
         }
     }
 
@@ -81,7 +81,8 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
             if (machineHolder.isServer()) {
                 long size = segmentHolder.getSize();
                 FileOutputStream fileOutputStream = null;
-                segmentHolder.setPath(FileManager.storageDir + "/" + fileHolder.getId() + "^_^" + segmentHolder.getId());
+//                segmentHolder.setPath(FileManager.storageDir + "/" + fileHolder.getId() + "^_^" + segmentHolder.getId());
+                segmentHolder.setPath(FileManager.storageDir + "/" + segmentHolder.getId());
                 ClientDatabase.instance.insertSegment(segmentHolder);
                 try {
                     File file = new File(segmentHolder.getPath());
@@ -165,18 +166,7 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
     }
 
     private List<MachineHolder> getAvailableMachines() {
-        List<MachineHolder> machines = ServerDatabase.instance.selectMachine(true);
-        if (!mUploadToMaster) {
-            MachineHolder toRemove = null;
-            for (MachineHolder machineHolder : machines) {
-                if (machineHolder.isServer()) {
-                    toRemove = machineHolder;
-                    break;
-                }
-            }
-            machines.remove(toRemove);
-        }
-        return machines;
+        return ServerDatabase.instance.getAvailableMachines(mUploadToMaster);
     }
 
     private MachineHolder findRandomMachine(boolean withMemory) {
@@ -197,7 +187,7 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
                 }
             }
         }
-        MachineHolder machineHolder = machines.get(random.nextInt(machines.size()));
+        MachineHolder machineHolder = machines.get(Util.RANDOM.nextInt(machines.size()));
         if (withMemory) {
             usedMachineHoldersIds.add(machineHolder.getId());
         }
@@ -205,6 +195,6 @@ public class UploadStreamingAlgorithm extends UploadAlgorithm {
     }
 
     private int findRandomSegmentMaxSize() {
-        return Algorithm.sizes[random.nextInt(Algorithm.sizes.length)] * 1024;
+        return Algorithm.sizes[Util.RANDOM.nextInt(Algorithm.sizes.length)] * 1024;
     }
 }

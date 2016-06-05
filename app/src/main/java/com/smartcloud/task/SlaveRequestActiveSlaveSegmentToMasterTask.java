@@ -12,7 +12,7 @@ import java.util.List;
 public class SlaveRequestActiveSlaveSegmentToMasterTask extends Task {
 
     public SlaveRequestActiveSlaveSegmentToMasterTask() {
-        super(TaskType.SLAVE_REQUEST_ACTIVE_SLAVE_SEGMENT_TO_MASTER, SynchronizationMode.SYNCHRONOUS);
+        super(TaskType.SLAVE_REQUEST_ACTIVE_SLAVE_SEGMENT_TO_MASTER, SynchronizationMode.ASYNCHRONOUS);
     }
 
     @Override

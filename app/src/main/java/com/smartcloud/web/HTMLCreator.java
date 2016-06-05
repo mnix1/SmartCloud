@@ -1,6 +1,7 @@
 package com.smartcloud.web;
 
-import com.smartcloud.algorithm.Algorithm;
+import com.smartcloud.constant.Algorithm;
+import com.smartcloud.constant.Redundancy;
 import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.holder.FileHolder;
 
@@ -27,6 +28,16 @@ public class HTMLCreator {
             sb.append("<option value='" + algorithm.toString() + "'>" + algorithm.toString() + "</option>");
         }
         sb.append("</select></br>");
+        int activeMachines = ServerDatabase.instance.selectMachine(true).size();
+        sb.append("Redundancja: <select id='redundancy' name='redundancy' onchange='selectChange()'>");
+        if (activeMachines > 1) {
+            for (Redundancy redundancy : Redundancy.values()) {
+                sb.append("<option value='" + redundancy.toString() + "'>" + redundancy.toString() + "</option>");
+            }
+        } else {
+            sb.append("<option value='" + Redundancy.NONE.toString() + "'>" + Redundancy.NONE.toString() + "</option>");
+        }
+        sb.append("</select></br>");
         sb.append("Stały rozmiar: <select id='segmentMaxSize' name='segmentMaxSize' onchange='selectChange()'>");
         for (int size : Algorithm.sizes) {
             if (size == 1024) {
@@ -36,7 +47,7 @@ public class HTMLCreator {
             }
         }
         sb.append("</select></br>");
-        if (ServerDatabase.instance.selectMachine(true).size() > 1) {
+        if (activeMachines > 1) {
             sb.append("Wrzucaj segmenty na Master: <input id='uploadToMaster' type='checkbox' onchange='selectChange()'></br>");
         }
         sb.append("<form id='uploadForm' method='post' enctype='multipart/form-data'>");
@@ -44,9 +55,10 @@ public class HTMLCreator {
         sb.append("<script>\n" +
                 "function selectChange(){\n" +
                 "    var algorithm = document.getElementById('algorithm').value;\n" +
+                "    var redundancy = document.getElementById('redundancy').value;\n" +
                 "    var segmentMaxSize = document.getElementById('segmentMaxSize').value;\n" +
                 "    var uploadToMaster = document.getElementById('uploadToMaster') == null ? true : document.getElementById('uploadToMaster').checked;\n" +
-                "    document.getElementById('uploadForm').setAttribute('action','/upload?algorithm='+algorithm+'&segmentMaxSize='+segmentMaxSize+'&uploadToMaster='+uploadToMaster);\n" +
+                "    document.getElementById('uploadForm').setAttribute('action','/upload?algorithm='+algorithm+'&redundancy='+redundancy+'&segmentMaxSize='+segmentMaxSize+'&uploadToMaster='+uploadToMaster);\n" +
                 "}\n" +
                 "selectChange();\n" +
                 "</script>");

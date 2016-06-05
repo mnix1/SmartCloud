@@ -1,4 +1,4 @@
-package com.smartcloud.algorithm;
+package com.smartcloud.constant;
 
 public enum Algorithm {
     FIXED__RANDOM_WITHOUT_MEM("", "Stały, nie większy niż wybrany", "Losowa bez pamięci"),

@@ -21,10 +21,12 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.security.SecureRandom;
 import java.util.Arrays;
 
 public class Util {
     public static final String[] UNITS = new String[]{"B", "KB", "MB", "GB", "TB", "PB"};
+    public static final SecureRandom RANDOM = new SecureRandom();
 
     public static String serializeToString(Object object) {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();

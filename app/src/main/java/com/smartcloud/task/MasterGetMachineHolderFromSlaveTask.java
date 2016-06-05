@@ -37,7 +37,7 @@ public class MasterGetMachineHolderFromSlaveTask extends Task {
                 machineHolder = ClientDatabase.instance.selectMachine();
                 ServerDatabase.instance.updateMachine(machineHolder);
             } else {
-                if (!machineHolder.isActive()) {
+                if (machineHolder.getAddress() == null) {
                     continue;
                 }
                 MasterGetMachineHolderFromSlaveTask task = null;

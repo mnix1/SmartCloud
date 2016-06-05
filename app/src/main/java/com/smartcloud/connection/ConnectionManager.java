@@ -43,7 +43,7 @@ public class ConnectionManager implements NetworkInitializedListener {
             ConnectionServer connectionServer = new ConnectionServer();
             mServerThread = new Thread(connectionServer);
             mServerThread.start();
-            new ClientCommunication(new SlaveSendMachineHolderToMasterTask()).init();
+//            new ClientCommunication(new SlaveSendMachineHolderToMasterTask()).init();
             new ClientCommunication(new SlaveRequestActiveSlaveSegmentToMasterTask()).init();
             FileManager.checkConsistency();
         } catch (Exception e) {

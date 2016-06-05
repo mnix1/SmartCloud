@@ -139,6 +139,22 @@ public class ServerDatabase extends Database {
         return machines;
     }
 
+    public List<MachineHolder> getAvailableMachines(boolean includeMaster) {
+        List<MachineHolder> machines = selectMachine(true);
+        if (!includeMaster) {
+            MachineHolder toRemove = null;
+            for (MachineHolder machineHolder : machines) {
+                if (machineHolder.isServer()) {
+                    toRemove = machineHolder;
+                    break;
+                }
+            }
+            machines.remove(toRemove);
+        }
+        return machines;
+    }
+
+
     public Long selectFreeSpace() {
         Cursor cursor = mDatabase.rawQuery("SELECT SUM(freeSpace) as freeSpace FROM " + MachineHolder.TABLE_NAME + " WHERE active = 1", null);
         cursor.moveToFirst();
@@ -157,6 +173,18 @@ public class ServerDatabase extends Database {
             return null;
         }
         FileHolder fileHolder = new FileHolder(id, cursor.getString(cursor.getColumnIndex("name")), cursor.getLong(cursor.getColumnIndex("size")));
+        cursor.close();
+        fileHolder.setFile(new File(FileManager.storageDir + "/" + fileHolder.getName()));
+        return fileHolder;
+    }
+
+    public FileHolder selectFile(String name) {
+        Cursor cursor = mDatabase.rawQuery("SELECT id, name, size FROM " + FileHolder.TABLE_NAME + " WHERE name = '" + name + "'", null);
+        cursor.moveToFirst();
+        if (!cursor.moveToFirst()) {
+            return null;
+        }
+        FileHolder fileHolder = new FileHolder(cursor.getLong(cursor.getColumnIndex("id")), cursor.getString(cursor.getColumnIndex("name")), cursor.getLong(cursor.getColumnIndex("size")));
         cursor.close();
         fileHolder.setFile(new File(FileManager.storageDir + "/" + fileHolder.getName()));
         return fileHolder;

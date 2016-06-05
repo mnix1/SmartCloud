@@ -4,6 +4,7 @@ import com.smartcloud.communication.ClientCommunication;
 import com.smartcloud.connection.ConnectionServer;
 import com.smartcloud.database.ClientDatabase;
 import com.smartcloud.database.ServerDatabase;
+import com.smartcloud.exception.FileNotAvailable;
 import com.smartcloud.task.MasterRequestDeleteSegmentToSlaveTask;
 import com.smartcloud.task.Task;
 import com.smartcloud.util.Util;
@@ -56,7 +57,10 @@ public class FileHolder implements Serializable {
             }
             if (machineHolder.isServer()) {
                 for (Long segmentId : map.get(machineId)) {
-                    new File(ClientDatabase.instance.selectSegment(segmentId).getPath()).delete();
+                    SegmentHolder segmentHolder = ClientDatabase.instance.selectSegment(segmentId);
+                    if (segmentHolder != null) {
+                        new File(segmentHolder.getPath()).delete();
+                    }
                     ClientDatabase.instance.deleteSegment(segmentId);
                 }
             } else {
@@ -127,11 +131,13 @@ public class FileHolder implements Serializable {
     }
 
     public boolean isActive() {
+        long byteTo = -1;
         for (SegmentHolder segmentHolder : ServerDatabase.instance.selectSegment(getId())) {
-            if (!segmentHolder.isActive()) {
-                return false;
+            if (!segmentHolder.isActive() || segmentHolder.getByteFrom() - 1 < byteTo) {
+                continue;
             }
+            byteTo = segmentHolder.getByteTo();
         }
-        return true;
+        return byteTo + 1 >= getSize();
     }
 }

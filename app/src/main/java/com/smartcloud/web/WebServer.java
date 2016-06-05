@@ -3,6 +3,7 @@ package com.smartcloud.web;
 import com.smartcloud.algorithm.DownloadStreamingAlgorithm;
 import com.smartcloud.algorithm.UploadStreamingAlgorithm;
 import com.smartcloud.holder.FileHolder;
+import com.smartcloud.algorithm.RedundancyAlgorithm;
 import com.smartcloud.task.MasterGetMachineHolderFromSlaveTask;
 
 import java.io.IOException;
@@ -40,7 +41,8 @@ public class WebServer extends NanoHTTPD {
         if (Method.PUT.equals(method) || Method.POST.equals(method)) {
             try {
                 new UploadStreamingAlgorithm((HTTPSession) session).perform();
-                return redirect();
+                new RedundancyAlgorithm((HTTPSession) session).perform();
+                return redirect(Response.Status.REDIRECT);
             } catch (IOException ioe) {
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, NanoHTTPD.MIME_PLAINTEXT, "SERVER INTERNAL ERROR: IOException: " + ioe.getMessage());
             } catch (ResponseException re) {
@@ -52,13 +54,13 @@ public class WebServer extends NanoHTTPD {
         } else if (Method.GET.equals(method) && uri.contains("/deleteFileId=")) {
             Long fileId = Long.parseLong(uri.replace("/deleteFileId=", ""));
             FileHolder.deleteFile(fileId);
-            return redirect();
+            return redirect(Response.Status.TEMPORARY_REDIRECT);
         }
         return newFixedLengthResponse("Smart Cloud");
     }
 
-    public static Response redirect() {
-        Response res = newFixedLengthResponse(Response.Status.REDIRECT, NanoHTTPD.MIME_HTML, HTMLCreator.createResponseHTML());
+    public static Response redirect(Response.Status status) {
+        Response res = newFixedLengthResponse(status, NanoHTTPD.MIME_HTML, HTMLCreator.createResponseHTML());
         res.addHeader("Location", "/");
         return res;
     }

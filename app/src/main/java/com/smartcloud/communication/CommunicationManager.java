@@ -37,9 +37,9 @@ public abstract class CommunicationManager {
     public void sendObject(Object object) {
         try {
             String message = Util.serializeToString(object);
-            mOutput.println(message.length());
-            mOutput.print(message);
-            mOutput.flush();
+//            mOutput.println(message.length());
+            mOutput.println(message);
+//            mOutput.flush();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -47,23 +47,27 @@ public abstract class CommunicationManager {
 
     public Object receiveObject() {
         try {
-            int messageLength = Integer.parseInt(mInput.readLine());
-            char[] chars = new char[messageLength];
-            int read = 0;
-            while (read < messageLength) {
-                read += mInput.read(chars, read, messageLength);
-            }
-            return Util.deserializeFromString(new String(chars));
+//            int messageLength = Integer.parseInt(mInput.readLine());
+//            char[] chars = new char[messageLength];
+//            int read = 0;
+//            while (read < messageLength) {
+//                read += mInput.read(chars, read, messageLength);
+//            }
+           String message =  mInput.readLine();
+            return Util.deserializeFromString(message);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
     }
 
-    public SegmentHolder receiveSegmentDataAndSaveAsFile() {
+    public SegmentHolder receiveSegmentDataAndSaveAsFile(Long segmentId) {
         SegmentHolder segmentHolder = null;
         try {
-            Long segmentId = Long.parseLong(mInput.readLine());
+            Long inputSegmentId = Long.parseLong(mInput.readLine());
+            if (segmentId == null) {
+                segmentId = inputSegmentId;
+            }
             segmentHolder = new SegmentHolder(segmentId, FileManager.storageDir + "/" + segmentId);
             File file = new File(segmentHolder.getPath());
             int size = Integer.parseInt(mInput.readLine());

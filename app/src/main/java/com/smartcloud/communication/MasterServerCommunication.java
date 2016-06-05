@@ -1,5 +1,6 @@
 package com.smartcloud.communication;
 
+import com.smartcloud.database.ClientDatabase;
 import com.smartcloud.database.ServerDatabase;
 import com.smartcloud.holder.MachineHolder;
 import com.smartcloud.holder.SegmentHolder;
@@ -24,6 +25,12 @@ public class MasterServerCommunication extends ServerCommunication {
             case SLAVE_REQUEST_ACTIVE_SLAVE_SEGMENT_TO_MASTER:
                 getMachineHolderAndSendActiveSegments();
                 break;
+            case MACHINE_GET_SEGMENT_FROM_MACHINE_AND_WRITE_TO_FILE:
+                List<Long> mSegmentIds = (List<Long>) receiveObject();
+                for (Long segmentId : mSegmentIds) {
+                    sendSegmentFromFile(ClientDatabase.instance.selectSegment(segmentId));
+                }
+                break;
             default:
                 break;
         }
@@ -31,9 +38,12 @@ public class MasterServerCommunication extends ServerCommunication {
 
     void getMachineHolderAndSendActiveSegments() {
         MachineHolder slaveMachineHolder = (MachineHolder) receiveObject();
+        MachineHolder.updateFromSlave(slaveMachineHolder, mSocket.getInetAddress().getHostAddress());
         sendObject(ServerDatabase.instance.selectSegment(slaveMachineHolder.getId()));
         List<SegmentHolder> segmentsNotActive = (List<SegmentHolder>) receiveObject();
-        ServerDatabase.instance.deleteSegments(segmentsNotActive);
+        if (segmentsNotActive != null) {
+            ServerDatabase.instance.deleteSegments(segmentsNotActive);
+        }
     }
 
     void receiveSlaveMachineHolder() {
